@@ -144,4 +144,106 @@ paths:
                   id: "justchecco"
                   name: "Francesco"
                   photo: "aGPsaG8="
-          
+    /conversations:
+      get:
+        tags:
+          - conversation
+        summary: Retrieves a list of the authenticated user's conversations
+        description: Retrieves conversations
+        operationId: getMyConversations
+        security:
+          - BearerAuth: []
+        responses:
+          '200':
+            description: List of conversations
+            content:
+              application/json:
+                schema:
+                  type: object
+                  description: Contains a list of /conversations
+                  required:
+                    - conversations
+                  properties:
+                    conversations:
+                      type: array
+                      description: List of conversations
+                      minItems: 0
+                      maxItems: 1000
+                      items:
+                        $ref: '#/components/schemas/ConversationDetailsSummary'
+              example:
+                conversations:
+                  - id: "conversazionesempio"
+                    name: "Chat di Gruppo"
+                    members:
+                      - "justchecco"
+                      - "justchecco2"
+                    conversationPhoto: "aGPsaG8="
+                    lastMessage:
+                      id: "msg123"
+                      senderId: "justchecco"
+                      senderName: "Francesco"
+                      content: "Ciao"
+                      timestamp: "2025-11-1T11:08:00Z"
+                      attachment: ""
+                      reactionCount: 0
+                      reactingUserIds: []
+      post:
+        tags:
+          - conversation
+        summary: Starts a new conversation
+        description: Creates a new conversation between two users
+        operationId: startConversation
+        security:
+          - BearerAuth: []
+        requestBody:
+          description: JSON payload with sender and recipient IDs
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Payload to start a conversation
+                required:
+                  - senderId
+                  - recipientId
+                properties:
+                  senderId:
+                    type: string
+                    description: Sender's ID
+                    example: "justchecco"
+                    pattern: '^[a-zA-Z0-9_]+$'
+                    minLength: 1
+                    maxLength: 50
+                  recipientId:
+                    type: string
+                    description: Recipient's ID
+                    example: "justchecco"
+                    pattern: '^[a-zA-Z0-9_]+$'
+                    minLength: 1
+                    maxLength: 50
+        responses:
+          '201':
+            description: Conversation started successfully and returns the conversation details
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/ConversationDetails'
+                example:
+                conversations:
+                  - id: "conversazionesempio"
+                    name: "Chat di Gruppo"
+                    members:
+                      - "justchecco"
+                      - "justchecco2"
+                    conversationPhoto: "aGPsaG8="
+                    lastMessage:
+                      id: "msg123"
+                      senderId: "justchecco"
+                      senderName: "Francesco"
+                      content: "Ciao"
+                      timestamp: "2025-11-1T11:08:00Z"
+                      attachment: ""
+                      reactionCount: 0
+                      reactingUserIds: []
+                
