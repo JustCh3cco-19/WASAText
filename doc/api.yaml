@@ -25,13 +25,13 @@ tags:
 
 components:
   securitySchemes:
-    bearerAuth:
+    BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: string
   
 security:
-  - bearerAuth: []
+  - BearerAuth: []
 
 paths:
   /session:
@@ -60,4 +60,88 @@ paths:
                 $ref: '#/components/schemas/LoginResponse'
               example:
                 identifier: "abcdef012345"
-      
+  /users/photo:
+    get:
+      tags:
+        - user
+      summary: Retrieves the authenticated user's photo
+      description: Returns the full User object
+      operationId: getMyPhoto
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User photo fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "justchecco"
+                name: "Francesco"
+                photo: "aGPsaG8="
+    put:
+      tags:
+        - user
+      summary: Updates the authenticated user's photo
+      description: Updates the user's photo and returns the updated User object
+      operationId: setMyPhoto
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: New photo (JPEG or PNG) as a base64-encoded string
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              description: PNG image file
+              pattern: '^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$'
+              minLength: 1
+              maxLength: 10485760
+          image/jpeg:
+            schema:
+              type: string
+              description: JPEG image file
+              pattern: '^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$'
+              minLength: 1
+              maxLength: 10485760
+      responses:
+        '200':
+          description: Photo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "justchecco"
+                name: "Francesco"
+                photo: "aGPsaG8="
+    /users/name:
+      put:
+        tags:
+          - user
+        summary: Updates the authenticated user's username
+        description: Updates the user's username
+        operationId: setMyUsername
+        security:
+          - BearerAuth: []
+        requestBody:
+          description: New username
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserRequest'
+        responses:
+          '200':
+            description: Username updated successfully
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/User'
+                example:
+                  id: "justchecco"
+                  name: "Francesco"
+                  photo: "aGPsaG8="
+          
