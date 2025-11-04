@@ -255,7 +255,7 @@ paths:
         - conversation
       summary: Retrieves details of a specific conversation
       description: Retrieves conversation details
-      operationId: getMyConversation
+      operationId: getConversation
       security:
         - BearerAuth: []
       parameters:
@@ -287,12 +287,54 @@ paths:
                   senderId: "justchecco"
                   senderName: "Francesco"
                   content: "Ciao"
-                  timestamp: "2025-11-1T11:08:00Z"
+                  timestamp: "2025-11-01T11:08:00Z"
                   attachment: ""
                   reactionCount: 0
                   reactingUserIds: []
                 messages: []
-  
+        '401':
+          description: Unauthorized — missing or invalid token
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Authentication error response
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+                    example: "Invalid or missing authentication token"
+        '403':
+          description: Forbidden - access to this conversation is denied
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Authorization error response
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+                    example: "User not authorized to access this conversation"
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Resource not found response
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+                    example: "Conversation not found"
+
   /conversations/{conversationId}/message:
     post:
       tags:
@@ -350,3 +392,429 @@ paths:
                 attachment: ""
                 reactionCount: 0
                 reactingUserIds: []
+  
+  /conversations/{conversationId}/message/{messageId}/forward:
+    post:
+      tags:
+        - message
+      summary: Forwards an existing message to another conversation
+      description: Forwards a message to another conversation
+      operationId: forwardMessage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          description: Conversation ID with the message to forward
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      requestBody:
+        description: JSON payload with the target conversation ID
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForwardMessageRequest'
+            example:
+              targetConversationId: "conversazionesempio"
+      responses:
+        '201':
+          description: Message forwarded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                id: "msg123"
+                senderId: "justchecco"
+                senderName: "Francesco"
+                content: "Ciao"
+                timestamp: "2025-11-1T11:08:00Z"
+                attachment: ""
+                reactionCount: 0
+                reactingUserIds: []
+  
+  /conversations/{conversationId}/message/{messageId}:
+    delete:
+      tags:
+        - message
+      summary: Deletes a message
+      description: Deletes a message from the conversation
+      operationId: deleteMessage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          description: Conversation ID
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      responses:
+        '204':
+          description: Message deleted successfully
+
+  /conversations/{conversationId}/message/{messageId}/comment:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        description: ID of the conversation.
+        schema:
+          type: string
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+      - name: messageId
+        in: path
+        required: true
+        description: ID of the message to comment on.
+        schema:
+          type: string
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+    post:
+      tags:
+        - comment
+      summary: Adds a comment to a message
+      description: Adds a comment to the specified message.
+      operationId: commentMessage
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: JSON payload with comment content.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCommentRequest'
+      responses:
+        '204':
+          description: Comment added successfully.
+    delete:
+      tags:
+        - comment
+      summary: Removes a comment from a message
+      description: Deletes a comment from the specified message.
+      operationId: uncommentMessage
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Comment deleted successfully.       
+  
+  /search:
+    get:
+      tags:
+        - conversation
+        - user
+      summary: Searches for users by username
+      description: Searches for users matching a query string.
+      operationId: searchUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          description: Username query parameter
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      responses:
+        '200':
+          description: Array of users matching the query.
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Array of User objects.
+                minItems: 0
+                maxItems: 1000
+                items:
+                  $ref: '#/components/schemas/User'
+              example:
+                - id: "justchecco"
+                  name: "Francesco"
+                  photo: "aGPsaG8"
+  
+  /groups:
+    get:
+      tags:
+        - group
+      summary: Retrieves the list of groups for the authenticated user
+      description: Retrieves groups.
+      operationId: getMyGroups
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of groups.
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Contains a list of groups.
+                required:
+                  - groups
+                properties:
+                  groups:
+                    type: array
+                    description: List of groups.
+                    minItems: 0
+                    maxItems: 1000
+                    items:
+                      $ref: '#/components/schemas/Group'
+              example:
+                groups:
+                  - id: "group123"
+                    name: "Group Chat"
+                    members:
+                      - "user123"
+                      - "user456"
+                    groupPhoto: "aGVsbG8="
+    post:
+      tags:
+        - group
+      summary: Creates a new group
+      description: |
+        Creates a new group conversation.
+        Expects multipart/form-data with fields for group name, a JSON string of member IDs (in property "membersJson"),
+        and a group image.
+      operationId: createGroup
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: Group creation data
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              description: Form data for group creation
+              properties:
+                name:
+                  type: string
+                  description: Name of the group.
+                  example: "Chat Di Gruppo"
+                  pattern: '^[a-zA-Z0-9_ ]+$'
+                  minLength: 3
+                  maxLength: 50
+                membersJson:
+                  type: string
+                  description: A JSON string array of member IDs (including the creator).
+                  example: '["justchecco","justchecco2"]'
+                  pattern: '^\[.*\]$'
+                  minLength: 2
+                  maxLength: 1000
+                image:
+                  type: string
+                  description: Group image (JPEG or PNG) as a base64 encoded string.
+                  example: "aGPsaG8"
+                  pattern: '^[A-Za-z0-9+/]*={0,2}$'
+                  minLength: 1
+                  maxLength: 10485760
+      responses:
+        '201':
+          description: Group created successfully and returns the canonical Group object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+              example:
+                id: "Gruppo"
+                name: "Group Chat"
+                members:
+                  - "justchecco"
+                  - "justchecco2"
+                groupPhoto: "aGPsaG8"
+  
+  /groups/{groupId}:
+    get:
+      tags:
+        - group
+      summary: Retrieves details of a specific group
+      description: Retrieves group details including members and group photo.
+      operationId: getGroup
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: ID of the group.
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      responses:
+        '200':
+          description: Group details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+              example:
+                id: "group123"
+                name: "Group Chat"
+                members:
+                  - "user123"
+                  - "user456"
+                groupPhoto: "aGVsbG8="
+    delete:
+      tags:
+        - group
+      summary: Leaves a group
+      description: Removes the authenticated user from the specified group
+      operationId: leaveGroup
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: ID of the group to leave
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      responses:
+        '204':
+          description: Left group successfully
+    post:
+      tags:
+        - group
+      summary: Adds a user to a group
+      description: Adds a user to the specified group
+      operationId: addToGroup
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: ID of the group
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      requestBody:
+        description: JSON payload with the user ID to add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddGroupMemberRequest'
+      responses:
+        '204':
+          description: User added to group successfully
+
+  /groups/{groupId}/name:
+    put:
+      tags:
+        - group
+      summary: Updates the group's name
+      description: Updates the group's name
+      operationId: setGroupName
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      requestBody:
+        description: New group name
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group name updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+              example:
+                id: "Gruppo"
+                name: "Nome Gruppo"
+                members:
+                  - "justchecco"
+                  - "justchecco2"
+                groupPhoto: "aGPsaG8"
+  
+  /groups/{groupId}/photo:
+    put:
+      tags:
+        - group
+      summary: Updates the group's photo
+      description: Updates the group's photo
+      operationId: setGroupPhoto
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+      requestBody:
+        description: New photo (JPEG or PNG) as a base64 encoded string.
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              description: PNG image file (base64 encoded)
+              pattern: '^[A-Za-z0-9+/]*={0,2}$'
+              minLength: 1
+              maxLength: 10485760
+          image/jpeg:
+            schema:
+              type: string
+              description: JPEG image file (base64 encoded)
+              pattern: '^[A-Za-z0-9+/]*={0,2}$'
+              minLength: 1
+              maxLength: 10485760
+      responses:
+        '200':
+          description: Group photo updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Confirmation message for group photo update
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    description: Confirmation message
+                    example: "Group photo updated successfully"
+                    pattern: '^.*$'
+                    minLength: 1
+                    maxLength: 100
