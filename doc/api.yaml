@@ -23,13 +23,6 @@ tags:
   - name: group
     description: Endpoints for creating, updating and managing group chats
 
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: string
-  
 security:
   - BearerAuth: []
 
@@ -161,35 +154,24 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                description: Contains a list of /conversations
-                required:
-                  - conversations
-                properties:
-                  conversations:
-                    type: array
-                    description: List of conversations
-                    minItems: 0
-                    maxItems: 1000
-                    items:
-                      $ref: '#/components/schemas/ConversationDetailsSummary'
-            example:
-              conversations:
-                - id: "conversazionesempio"
-                  name: "Chat di Gruppo"
-                  members:
-                    - "justchecco"
-                    - "justchecco2"
-                  conversationPhoto: "aGPsaG8="
-                  lastMessage:
-                    id: "msg123"
-                    senderId: "justchecco"
-                    senderName: "Francesco"
-                    content: "Ciao"
-                    timestamp: "2025-11-1T11:08:00Z"
-                    attachment: ""
-                    reactionCount: 0
-                    reactingUserIds: []
+                $ref: '#/components/schemas/ConversationsList'
+              example:
+                conversations:
+                  - id: "conversazionesempio"
+                    name: "Chat di Gruppo"
+                    members:
+                      - "justchecco"
+                      - "justchecco2"
+                    conversationPhoto: "aGPsaG8="
+                    lastMessage:
+                      id: "msg123"
+                      senderId: "justchecco"
+                      senderName: "Francesco"
+                      content: "Ciao"
+                      timestamp: "2025-11-1T11:08:00Z"
+                      attachment: ""
+                      reactionCount: 0
+                      reactingUserIds: []
     post:
       tags:
         - conversation
@@ -232,22 +214,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationDetails'
               example:
-                conversations:
-                  id: "conversazionesempio"
-                  name: "Chat di Gruppo"
-                  members:
-                    - "justchecco"
-                    - "justchecco2"
-                  conversationPhoto: "aGPsaG8="
-                  lastMessage:
-                    id: "msg123"
-                    senderId: "justchecco"
-                    senderName: "Francesco"
-                    content: "Ciao"
-                    timestamp: "2025-11-1T11:08:00Z"
-                    attachment: ""
-                    reactionCount: 0
-                    reactingUserIds: []
+                id: "conversazionesempio"
+                name: "Chat di Gruppo"
+                members:
+                  - "justchecco"
+                  - "justchecco2"
+                conversationPhoto: "aGPsaG8="
+                lastMessage:
+                  id: "msg123"
+                  senderId: "justchecco"
+                  senderName: "Francesco"
+                  content: "Ciao"
+                  timestamp: "2025-11-01T11:08:00Z"
+                  attachment: ""
+                  reactionCount: 0
+                  reactingUserIds: []
+                messages: []
   
   /conversations/{conversationId}:
     get:
@@ -818,3 +800,407 @@ paths:
                     pattern: '^.*$'
                     minLength: 1
                     maxLength: 100
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      description: Request schema for user login.
+      required:
+        - name
+        - photo
+      properties:
+        name:
+          type: string
+          description: The name of the user to log in.
+          example: "Maria"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 3
+          maxLength: 16
+        photo:
+          type: string
+          description: Base64-encoded default photo.
+          example: "aGVsbG8="
+          pattern: '^[A-Za-z0-9+/]+={0,2}$'
+          minLength: 1
+          maxLength: 1000000
+
+    LoginResponse:
+      type: object
+      description: Response schema for user login.
+      properties:
+        identifier:
+          type: string
+          description: The identifier of the logged-in user.
+          example: "abcdef012345"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+
+    UpdateUserRequest:
+      type: object
+      description: Request schema for updating user information.
+      properties:
+        name:
+          type: string
+          description: New username.
+          example: "NewName"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 3
+          maxLength: 16
+
+    User:
+      type: object
+      description: User schema.
+      required:
+        - id
+        - name
+        - photo
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the user.
+          example: "user123"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          description: Name of the user.
+          example: "Maria"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 3
+          maxLength: 16
+        photo:
+          type: string
+          description: User photo in base64 encoding.
+          example: "aGVsbG8="
+          pattern: '^[A-Za-z0-9+/]+={0,2}$'
+          minLength: 1
+          maxLength: 1000000
+
+    ConversationDetailsSummary:
+      type: object
+      description: A summary of a conversation between users.
+      required:
+        - id
+        - name
+        - members
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the conversation.
+          example: "conv123"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          description: Name of the conversation.
+          example: "Group Chat"
+          pattern: '^[a-zA-Z0-9_ ]+$'
+          minLength: 1
+          maxLength: 50
+        members:
+          type: array
+          description: List of user IDs participating in the conversation.
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: string
+            description: User ID.
+            example: "user123"
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+        conversationPhoto:
+          type: string
+          description: Base64-encoded conversation photo (if any).
+          example: "aGVsbG8="
+          pattern: '^[A-Za-z0-9+/]*={0,2}$'
+          minLength: 0
+          maxLength: 1000000
+        lastMessage:
+          $ref: '#/components/schemas/Message'
+
+    ConversationDetails:
+      title: "Conversation Details"
+      type: object
+      description: Detailed conversation schema.
+      required:
+        - id
+        - name
+        - members
+        - messages
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the conversation.
+          example: "conv123"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          description: Name of the conversation.
+          example: "Group Chat"
+          pattern: '^[a-zA-Z0-9_ ]+$'
+          minLength: 1
+          maxLength: 50
+        members:
+          type: array
+          description: List of user IDs participating in the conversation.
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: string
+            description: User ID.
+            example: "user123"
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+        conversationPhoto:
+          type: string
+          description: Base64-encoded conversation photo (if any).
+          example: "aGVsbG8="
+          pattern: '^[A-Za-z0-9+/]*={0,2}$'
+          minLength: 0
+          maxLength: 1000000
+        lastMessage:
+          $ref: '#/components/schemas/Message'
+        messages:
+          type: array
+          description: List of messages in the conversation.
+          minItems: 0
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/Message'
+
+    Message:
+      type: object
+      description: A message sent in a conversation.
+      required:
+        - id
+        - senderId
+        - senderName
+        - content
+        - timestamp
+        - attachment
+        - reactionCount
+        - reactingUserIds
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the message.
+          example: "msg123"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        senderId:
+          type: string
+          description: ID of the user who sent the message.
+          example: "user456"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        senderName:
+          type: string
+          description: Name of the sender.
+          example: "Alice"
+          pattern: '^[a-zA-Z0-9 ]+$'
+          minLength: 1
+          maxLength: 50
+        content:
+          type: string
+          description: Content of the message.
+          example: "Hello, world!"
+          pattern: '^.*$'
+          minLength: 1
+          maxLength: 1000
+        timestamp:
+          type: string
+          format: date-time
+          description: When the message was sent.
+          example: "2023-10-20T10:05:00Z"
+          minLength: 20
+          maxLength: 29
+        attachment:
+          type: string
+          description: Base64-encoded attachment (if any).
+          example: ""
+          pattern: '^[A-Za-z0-9+/]*={0,2}$'
+          minLength: 0
+          maxLength: 10485760
+        reactionCount:
+          type: integer
+          description: Number of reactions on the message.
+          example: 2
+        reactingUserIds:
+          type: array
+          description: List of user IDs who have reacted to the message.
+          minItems: 0
+          maxItems: 1000
+          items:
+            type: string
+            example: "user123"
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+        replyTo:
+          type: string
+          description: (Optional) ID of the message being replied to.
+          example: ""
+          pattern: '^[a-zA-Z0-9_]*$'
+          minLength: 0
+          maxLength: 50
+        replyContent:
+          type: string
+          description: (Optional) A preview of the message being replied to.
+          example: ""
+          pattern: '^.*$'
+          minLength: 0
+          maxLength: 1000
+        replySenderName:
+          type: string
+          description: (Optional) Name of the sender of the replied-to message.
+          example: ""
+          pattern: '^[a-zA-Z0-9 ]*$'
+          minLength: 0
+          maxLength: 50
+        replyAttachment:
+          type: string
+          description: (Optional) Base64-encoded attachment from the replied-to message.
+          example: ""
+          pattern: '^[A-Za-z0-9+/]*={0,2}$'
+          minLength: 0
+          maxLength: 10485760
+        status:
+          type: string
+          description: (Optional) Delivery/read status; provided only for messages not sent by the authenticated user.
+          example: "✓"
+          pattern: '^.*$'
+          minLength: 0
+          maxLength: 10
+
+    ForwardMessageRequest:
+      type: object
+      description: Request schema for forwarding a message.
+      required:
+        - targetConversationId
+      properties:
+        targetConversationId:
+          type: string
+          description: ID of the conversation to which the message will be forwarded.
+          example: "conv456"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        forwarderName:
+          type: string
+          description: (Optional) Name of the user forwarding the message.
+          example: "Maria"
+          pattern: '^[a-zA-Z0-9 ]*$'
+          minLength: 0
+          maxLength: 50
+
+    AddCommentRequest:
+      type: object
+      description: Request schema for adding a comment.
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          description: The content of the comment.
+          example: "Nice post!"
+          pattern: '^.*$'
+          minLength: 1
+          maxLength: 500
+
+    AddGroupMemberRequest:
+      type: object
+      description: Request schema for adding a group member.
+      required:
+        - userId
+      properties:
+        userId:
+          type: string
+          description: ID of the user to add.
+          example: "user789"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+
+    UpdateGroupRequest:
+      type: object
+      description: Request schema for updating group information.
+      required:
+        - groupName
+      properties:
+        groupName:
+          type: string
+          description: New name of the group.
+          example: "New Group Name"
+          pattern: '^[a-zA-Z0-9_ ]+$'
+          minLength: 3
+          maxLength: 16
+
+    Group:
+      type: object
+      description: Group schema.
+      required:
+        - id
+        - name
+        - members
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the group.
+          example: "group123"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          description: Name of the group.
+          example: "Group Chat"
+          pattern: '^[a-zA-Z0-9_ ]+$'
+          minLength: 3
+          maxLength: 50
+        members:
+          type: array
+          description: List of user IDs that are members of the group.
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: string
+            description: User ID.
+            example: "user123"
+            pattern: '^[a-zA-Z0-9_]+$'
+            minLength: 1
+            maxLength: 50
+        groupPhoto:
+          type: string
+          description: Base64-encoded group photo (if any).
+          example: "aGVsbG8="
+          pattern: '^[A-Za-z0-9+/]*={0,2}$'
+          minLength: 0
+          maxLength: 1000000
+
+    ConversationsList:
+      type: object
+      description: Container for a list of conversations.
+      required:
+        - conversations
+      properties:
+        conversations:
+          type: array
+          description: List of conversations
+          minItems: 0
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/ConversationDetailsSummary'
