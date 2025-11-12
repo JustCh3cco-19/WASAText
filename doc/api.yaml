@@ -37,38 +37,6 @@ components:
       bearerFormat: JWT
 
   schemas:
-    LoginRequest:
-      type: object
-      description: Request schema for user login.
-      required: [name, photo]
-      properties:
-        name:
-          type: string
-          description: The name of the user to log in.
-          example: "Francesco"
-          pattern: '^[a-zA-Z0-9_]+$'
-          minLength: 3
-          maxLength: 16
-        photo:
-          type: string
-          description: Base64-encoded default photo.
-          example: "aGPsaG8"
-          pattern: '^[A-Za-z0-9+/]+={0,2}$'
-          minLength: 1
-          maxLength: 1000000
-
-    LoginResponse:
-      type: object
-      description: Response schema for user login.
-      properties:
-        identifier:
-          type: string
-          description: The identifier of the logged-in user.
-          example: "abcdef012345"
-          pattern: '^[a-zA-Z0-9_]+$'
-          minLength: 1
-          maxLength: 50
-
     UpdateUserRequest:
       type: object
       description: Request schema for updating user information.
@@ -424,31 +392,46 @@ security:
 paths:
   /session:
     post:
-      tags: [login]
-      summary: Creates a new session
-      description: Creates a new session
-      operationId: createSession
+      tags: ["login"]
+      summary: Logs in the user
+      description: |-
+        If the user does not exist, it will be created,
+        and an identifier is returned.
+        If the user exists, the user identifier is returned.
+      operationId: doLogin
       requestBody:
+        description: User details
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              type: object
+              description: Simplified login payload.
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Name to assign to the user.
+                  example: Francesco
+                  pattern: '^.*?$'
+                  minLength: 3
+                  maxLength: 16
       responses:
-        '200':
-          description: Session created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoginResponse'
-              example:
-                identifier: "abcdef012345"
         '201':
-          description: Session created
+          description: User log-in action successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                type: object
+                description: Simplified login response payload.
+                properties:
+                  identifier:
+                    type: string
+                    description: Identifier assigned to the user.
+                    pattern: '^[a-zA-Z0-9_]+$'
+                    minLength: 1
+                    maxLength: 50
+                    example: "abcdef012345"
               example:
                 identifier: "abcdef012345"
 
@@ -496,7 +479,7 @@ paths:
       tags: [user]
       summary: Updates the authenticated user's username
       description: Updates the user's username
-      operationId: setMyUsername
+      operationId: setMyUserName
       security: [ { BearerAuth: [] } ]
       requestBody:
         description: New username
