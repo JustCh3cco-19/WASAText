@@ -18,4 +18,14 @@ type RequestContext struct {
 
 	// Logger is a custom field logger for the request
 	Logger logrus.FieldLogger
+
+	// AuthenticatedUser contains the identity extracted from Authorization headers (when available)
+	AuthenticatedUser *AuthenticatedUser
+}
+
+// AuthenticatedUser describes the authenticated principal
+type AuthenticatedUser struct {
+	ID    string
+	Name  string
+	Photo string
 }
