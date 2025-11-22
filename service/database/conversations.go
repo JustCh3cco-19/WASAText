@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -93,12 +94,11 @@ func (db *appdbimpl) EnsureDirectConversation(ctx context.Context, requesterID, 
 		  AND (SELECT COUNT(*) FROM conversation_members m WHERE m.conversation_id = c.id) = 2
 		LIMIT 1`, requesterID, recipientID).Scan(&conversationID)
 
-	switch err {
-	case nil:
-		return db.GetConversationDetails(ctx, requesterID, conversationID)
-	case sql.ErrNoRows:
-	default:
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return ConversationDetails{}, fmt.Errorf("query direct conversation: %w", err)
+	}
+	if err == nil {
+		return db.GetConversationDetails(ctx, requesterID, conversationID)
 	}
 
 	conversationID = generateIdentifier()

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -29,7 +30,7 @@ func (db *appdbimpl) EnsureUserByName(ctx context.Context, name string) (User, e
 		}
 		return user, nil
 	}
-	if err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return User{}, fmt.Errorf("query user: %w", err)
 	}
 
@@ -52,7 +53,7 @@ func (db *appdbimpl) EnsureUserByName(ctx context.Context, name string) (User, e
 func (db *appdbimpl) GetUserByID(ctx context.Context, id string) (User, error) {
 	user, err := scanUser(db.c.QueryRowContext(ctx, `SELECT id, name, photo FROM users WHERE id = ?`, id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrNotFound
 		}
 		return User{}, fmt.Errorf("query user by id: %w", err)
@@ -86,7 +87,7 @@ func (db *appdbimpl) UpdateUserName(ctx context.Context, id, name string) (User,
 	if err == nil && existing != id {
 		return User{}, ErrConflict
 	}
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return User{}, fmt.Errorf("check duplicate name: %w", err)
 	}
 

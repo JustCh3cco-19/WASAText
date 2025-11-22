@@ -122,7 +122,7 @@ func (db *appdbimpl) Ping() error {
 
 func (db *appdbimpl) sanitizeMembers(ids []string) []string {
 	seen := make(map[string]struct{})
-	var res []string
+	res := make([]string, 0, len(ids))
 	for _, id := range ids {
 		id = strings.TrimSpace(id)
 		if id == "" {
