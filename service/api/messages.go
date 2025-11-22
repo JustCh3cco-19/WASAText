@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/api/reqcontext"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/database"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/globaltime"
+	"github.com/JustCh3cco-19/WASAText/service/api/reqcontext"
+	"github.com/JustCh3cco-19/WASAText/service/database"
+	"github.com/JustCh3cco-19/WASAText/service/globaltime"
 	"github.com/julienschmidt/httprouter"
 )
 

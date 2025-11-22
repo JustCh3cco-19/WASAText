@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/api/reqcontext"
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/database"
+	"github.com/JustCh3cco-19/WASAText/service/api/reqcontext"
+	"github.com/JustCh3cco-19/WASAText/service/database"
 )
 
 func (rt *_router) respondDBError(w http.ResponseWriter, ctx reqcontext.RequestContext, err error, notFoundMessage string) {

@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"git.sapienzaapps.it/fantasticcoffee/fantastic-coffee-decaffeinated/service/database"
+	"github.com/JustCh3cco-19/WASAText/service/database"
 )
 
 type userResponse struct {

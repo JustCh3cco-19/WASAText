@@ -135,7 +135,6 @@ func (db *appdbimpl) SearchUsers(ctx context.Context, username string) ([]User, 
 	return users, nil
 }
 
-
 func scanUser(row *sql.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Name, &u.Photo)
