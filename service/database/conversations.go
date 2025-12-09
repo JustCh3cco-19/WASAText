@@ -351,8 +351,13 @@ func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversati
 
 func scanMessageRow(rows *sql.Rows) (Message, error) {
 	var (
-		timestamp string
-		msg       Message
+		timestamp       string
+		replyTo         sql.NullString
+		replyContent    sql.NullString
+		replySenderName sql.NullString
+		replyAttachment sql.NullString
+		status          sql.NullString
+		msg             Message
 	)
 	err := rows.Scan(
 		&msg.ID,
@@ -362,11 +367,11 @@ func scanMessageRow(rows *sql.Rows) (Message, error) {
 		&msg.Content,
 		&msg.Attachment,
 		&timestamp,
-		&msg.ReplyTo,
-		&msg.ReplyContent,
-		&msg.ReplySenderName,
-		&msg.ReplyAttachment,
-		&msg.Status,
+		&replyTo,
+		&replyContent,
+		&replySenderName,
+		&replyAttachment,
+		&status,
 	)
 	if err != nil {
 		return Message{}, err
@@ -375,6 +380,21 @@ func scanMessageRow(rows *sql.Rows) (Message, error) {
 		if t, err := time.Parse(time.RFC3339Nano, timestamp); err == nil {
 			msg.Timestamp = t
 		}
+	}
+	if replyTo.Valid {
+		msg.ReplyTo = replyTo.String
+	}
+	if replyContent.Valid {
+		msg.ReplyContent = replyContent.String
+	}
+	if replySenderName.Valid {
+		msg.ReplySenderName = replySenderName.String
+	}
+	if replyAttachment.Valid {
+		msg.ReplyAttachment = replyAttachment.String
+	}
+	if status.Valid {
+		msg.Status = status.String
 	}
 	return msg, nil
 }

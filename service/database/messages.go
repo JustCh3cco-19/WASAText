@@ -127,10 +127,17 @@ func (db *appdbimpl) getMessageByID(ctx context.Context, messageID string) (Mess
 		SELECT id, conversation_id, sender_id, sender_name, content, attachment, created_at,
 		       reply_to, reply_content, reply_sender_name, reply_attachment, status
 		FROM messages WHERE id = ?`, messageID)
-	var msg Message
-	var createdAt string
+	var (
+		msg             Message
+		createdAt       string
+		replyTo         sql.NullString
+		replyContent    sql.NullString
+		replySenderName sql.NullString
+		replyAttachment sql.NullString
+		status          sql.NullString
+	)
 	if err := row.Scan(&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.SenderName, &msg.Content, &msg.Attachment,
-		&createdAt, &msg.ReplyTo, &msg.ReplyContent, &msg.ReplySenderName, &msg.ReplyAttachment, &msg.Status); err != nil {
+		&createdAt, &replyTo, &replyContent, &replySenderName, &replyAttachment, &status); err != nil {
 		if err == sql.ErrNoRows {
 			return Message{}, ErrNotFound
 		}
@@ -140,6 +147,21 @@ func (db *appdbimpl) getMessageByID(ctx context.Context, messageID string) (Mess
 		if parsed, err := time.Parse(time.RFC3339Nano, createdAt); err == nil {
 			msg.Timestamp = parsed
 		}
+	}
+	if replyTo.Valid {
+		msg.ReplyTo = replyTo.String
+	}
+	if replyContent.Valid {
+		msg.ReplyContent = replyContent.String
+	}
+	if replySenderName.Valid {
+		msg.ReplySenderName = replySenderName.String
+	}
+	if replyAttachment.Valid {
+		msg.ReplyAttachment = replyAttachment.String
+	}
+	if status.Valid {
+		msg.Status = status.String
 	}
 	reactions, err := db.loadReactions(ctx, []string{msg.ID})
 	if err == nil {
