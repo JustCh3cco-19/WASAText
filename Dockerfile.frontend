@@ -1,0 +1,25 @@
+# Fase di build
+FROM node:lts AS builder
+
+WORKDIR /src/
+
+# Copio il progetto frontend
+COPY ./webui ./webui
+
+WORKDIR /src/webui
+
+# Yarn 4 con PnP
+RUN corepack enable && yarn install --immutable
+
+# Build in produzione
+RUN yarn build-prod
+
+# Fase runtime con Nginx
+FROM nginx:alpine
+
+# Copio l'output generato
+COPY --from=builder /src/webui/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

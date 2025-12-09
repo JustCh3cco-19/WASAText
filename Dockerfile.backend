@@ -1,0 +1,22 @@
+# Fase di build
+FROM golang:latest AS builder
+
+WORKDIR /src
+
+# Copio tutto il backend
+COPY . .
+
+# Compilo il binario
+RUN go build -o /app/webapi ./cmd/webapi
+
+# Fase runtime
+FROM debian:bookworm
+
+WORKDIR /app
+
+# Copio binario e immagini
+COPY --from=builder /app/webapi ./
+
+EXPOSE 3000
+
+CMD ["/app/webapi"]

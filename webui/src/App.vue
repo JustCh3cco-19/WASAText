@@ -1,17 +1,30 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-</script>
-<script>
-export default {}
+import {computed} from "vue";
+import {RouterLink, RouterView, useRouter} from "vue-router";
+import sessionStore from "./services/sessionStore.js";
+
+const router = useRouter();
+const isAuthenticated = computed(() => sessionStore.isAuthenticated());
+const userLabel = computed(() => sessionStore.state.user?.name || sessionStore.state.token || "Ospite");
+
+function doLogout() {
+	sessionStore.logout();
+	router.push("/login");
+}
 </script>
 
 <template>
-
 	<header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-		<a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#/">Example App</a>
+		<RouterLink class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" to="/conversations">
+			WASAText
+		</RouterLink>
 		<button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
 			<span class="navbar-toggler-icon"></span>
 		</button>
+		<div class="w-100 text-end pe-3 text-white small">
+			<span v-if="isAuthenticated">Ciao, {{ userLabel }}</span>
+			<button v-if="isAuthenticated" class="btn btn-sm btn-outline-light ms-2" @click="doLogout">Logout</button>
+		</div>
 	</header>
 
 	<div class="container-fluid">
@@ -19,39 +32,39 @@ export default {}
 			<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
 				<div class="position-sticky pt-3 sidebar-sticky">
 					<h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-						<span>General</span>
+						<span>Navigazione</span>
 					</h6>
 					<ul class="nav flex-column">
 						<li class="nav-item">
-							<RouterLink to="/" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#home"/></svg>
-								Home
+							<RouterLink to="/conversations" class="nav-link">
+								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#message-square"/></svg>
+								Conversazioni
 							</RouterLink>
 						</li>
 						<li class="nav-item">
-							<RouterLink to="/link1" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#layout"/></svg>
-								Menu item 1
+							<RouterLink to="/groups" class="nav-link">
+								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#users"/></svg>
+								Gruppi
 							</RouterLink>
 						</li>
 						<li class="nav-item">
-							<RouterLink to="/link2" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#key"/></svg>
-								Menu item 2
+							<RouterLink to="/search" class="nav-link">
+								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#search"/></svg>
+								Cerca utenti
 							</RouterLink>
 						</li>
-					</ul>
-
-					<h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-						<span>Secondary menu</span>
-					</h6>
-					<ul class="nav flex-column">
 						<li class="nav-item">
-							<RouterLink :to="'/some/' + 'variable_here' + '/path'" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#file-text"/></svg>
-								Item 1
-							</RouterLink>
-						</li>
+							<RouterLink to="/profile" class="nav-link">
+						<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#user"/></svg>
+						Profilo
+					</RouterLink>
+				</li>
+				<li class="nav-item" v-if="!isAuthenticated">
+					<RouterLink to="/login" class="nav-link">
+						<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#log-in"/></svg>
+						Login
+					</RouterLink>
+				</li>
 					</ul>
 				</div>
 			</nav>
@@ -62,6 +75,3 @@ export default {}
 		</div>
 	</div>
 </template>
-
-<style>
-</style>
