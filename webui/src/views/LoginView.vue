@@ -10,6 +10,11 @@ export default {
 			loading: false,
 		};
 	},
+	mounted() {
+		if (sessionStore.isAuthenticated()) {
+			this.$router.push("/conversations");
+		}
+	},
 	methods: {
 		async submit() {
 			if (!this.name.trim()) {
@@ -31,30 +36,25 @@ export default {
 			this.loading = false;
 		},
 	},
-	mounted() {
-		if (sessionStore.isAuthenticated()) {
-			this.$router.push("/conversations");
-		}
-	},
 };
 </script>
 
 <template>
-	<div class="py-4">
-		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-			<h1 class="h3">Login</h1>
-		</div>
-		<ErrorMsg v-if="errormsg" :msg="errormsg" />
-		<LoadingSpinner :loading="loading">
-			<form class="card p-3" @submit.prevent="submit">
-				<div class="mb-3">
-					<label class="form-label">Nome utente</label>
-					<input class="form-control" v-model="name" placeholder="es. justchecco" required minlength="3" maxlength="16" />
-				</div>
-				<div class="d-flex justify-content-end">
-					<button type="submit" class="btn btn-primary">Entra</button>
-				</div>
-			</form>
-		</LoadingSpinner>
-	</div>
+  <div class="py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <h1 class="h3">Login</h1>
+    </div>
+    <ErrorMsg v-if="errormsg" :msg="errormsg" />
+    <LoadingSpinner :loading="loading">
+      <form class="card p-3" @submit.prevent="submit">
+        <div class="mb-3">
+          <label class="form-label">Nome utente</label>
+          <input v-model="name" class="form-control" placeholder="es. justchecco" required minlength="3" maxlength="16">
+        </div>
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary">Entra</button>
+        </div>
+      </form>
+    </LoadingSpinner>
+  </div>
 </template>

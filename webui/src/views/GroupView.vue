@@ -3,7 +3,12 @@ import api from "../services/api.js";
 import {fileToBase64} from "../services/files.js";
 
 export default {
-	props: ["id"],
+	props: {
+		id: {
+			type: String,
+			required: true,
+		},
+	},
 	data() {
 		return {
 			group: null,
@@ -15,6 +20,14 @@ export default {
 			newUserQuery: "",
 			updatingPhoto: false,
 		};
+	},
+	watch: {
+		id: {
+			immediate: true,
+			handler() {
+				this.refresh();
+			},
+		},
 	},
 	methods: {
 		async refresh() {
@@ -116,77 +129,69 @@ export default {
 			return Array.from({length: count}, (_, idx) => ({name: `Membro ${idx + 1}`}));
 		},
 	},
-	watch: {
-		id: {
-			immediate: true,
-			handler() {
-				this.refresh();
-			},
-		},
-	},
 };
 </script>
 
 <template>
-	<div class="py-4">
-		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-			<div>
-				<h1 class="h3 mb-0">{{ group?.name || "Gruppo" }}</h1>
-				<p class="text-muted small mb-0">ID: {{ id }}</p>
-			</div>
-			<div class="btn-toolbar">
-				<button class="btn btn-outline-secondary btn-sm me-2" @click="refresh">Refresh</button>
-				<button class="btn btn-outline-danger btn-sm" @click="leaveGroup">Esci</button>
-			</div>
-		</div>
+  <div class="py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <div>
+        <h1 class="h3 mb-0">{{ group?.name || "Gruppo" }}</h1>
+        <p class="text-muted small mb-0">ID: {{ id }}</p>
+      </div>
+      <div class="btn-toolbar">
+        <button class="btn btn-outline-secondary btn-sm me-2" @click="refresh">Refresh</button>
+        <button class="btn btn-outline-danger btn-sm" @click="leaveGroup">Esci</button>
+      </div>
+    </div>
 
-		<ErrorMsg v-if="errormsg" :msg="errormsg" />
+    <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
-		<LoadingSpinner :loading="loading">
-			<div class="card mb-3">
-				<div class="card-body">
-					<h5 class="card-title">Impostazioni gruppo</h5>
-					<div class="row g-2">
-						<div class="col-md-6">
-							<label class="form-label">Nome</label>
-							<div class="input-group">
-								<input class="form-control" v-model="newName" />
-								<button class="btn btn-primary" :disabled="updatingName" @click="updateName">Salva</button>
-							</div>
-						</div>
-						<div class="col-md-6">
-							<label class="form-label">Foto</label>
-							<input class="form-control" type="file" @change="onPhotoChange" :disabled="updatingPhoto" />
-						</div>
-					</div>
-					<div class="mt-3 row g-2">
-						<div class="col-md-6">
-							<label class="form-label">Aggiungi utente</label>
-							<div class="input-group">
-								<input
-									class="form-control"
-									placeholder="Nome utente"
-									v-model="newUserQuery"
-									@keyup.enter="addUser"
-								/>
-								<button class="btn btn-secondary" :disabled="addingUser" @click="addUser">Aggiungi</button>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+    <LoadingSpinner :loading="loading">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Impostazioni gruppo</h5>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Nome</label>
+              <div class="input-group">
+                <input v-model="newName" class="form-control">
+                <button class="btn btn-primary" :disabled="updatingName" @click="updateName">Salva</button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Foto</label>
+              <input class="form-control" type="file" :disabled="updatingPhoto" @change="onPhotoChange">
+            </div>
+          </div>
+          <div class="mt-3 row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Aggiungi utente</label>
+              <div class="input-group">
+                <input
+                  v-model="newUserQuery"
+                  class="form-control"
+                  placeholder="Nome utente"
+                  @keyup.enter="addUser"
+                >
+                <button class="btn btn-secondary" :disabled="addingUser" @click="addUser">Aggiungi</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-			<div class="card">
-				<div class="card-body">
-					<h5 class="card-title">Membri</h5>
-					<div class="list-group">
-						<div v-for="member in memberList()" :key="member.id || member" class="list-group-item">
-							<strong>{{ member.name || member.id }}</strong>
-						</div>
-						<div v-if="memberList().length === 0" class="text-muted">Nessun membro.</div>
-					</div>
-				</div>
-			</div>
-		</LoadingSpinner>
-	</div>
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Membri</h5>
+          <div class="list-group">
+            <div v-for="member in memberList()" :key="member.id || member" class="list-group-item">
+              <strong>{{ member.name || member.id }}</strong>
+            </div>
+            <div v-if="memberList().length === 0" class="text-muted">Nessun membro.</div>
+          </div>
+        </div>
+      </div>
+    </LoadingSpinner>
+  </div>
 </template>

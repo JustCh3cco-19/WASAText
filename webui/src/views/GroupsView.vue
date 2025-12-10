@@ -17,6 +17,9 @@ export default {
 			},
 		};
 	},
+	mounted() {
+		this.refresh();
+	},
 	methods: {
 		async refresh() {
 			this.loading = true;
@@ -102,59 +105,56 @@ export default {
 			return "Partecipanti non disponibili";
 		},
 	},
-	mounted() {
-		this.refresh();
-	},
 };
 </script>
 
 <template>
-	<div class="py-4">
-		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-			<h1 class="h3 mb-0">Gruppi</h1>
-		</div>
+  <div class="py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <h1 class="h3 mb-0">Gruppi</h1>
+    </div>
 
-		<ErrorMsg v-if="errormsg" :msg="errormsg" />
+    <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
-		<div class="card mb-3">
-			<div class="card-body">
-				<h5 class="card-title">Crea gruppo</h5>
-				<div class="row g-2">
-					<div class="col-md-4">
-						<input class="form-control" placeholder="Nome gruppo" v-model="newGroup.name" />
-					</div>
-					<div class="col-md-4">
-						<input
-							class="form-control"
-							placeholder="Nomi utenti separati da virgola"
-							v-model="newGroup.members"
-						/>
-					</div>
-					<div class="col-md-4">
-						<input class="form-control" type="file" @change="onImageChange" />
-					</div>
-				</div>
-				<div class="mt-3 d-flex justify-content-end">
-					<button class="btn btn-primary" :disabled="creating" @click="createGroup">Crea</button>
-				</div>
-			</div>
-		</div>
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Crea gruppo</h5>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <input v-model="newGroup.name" class="form-control" placeholder="Nome gruppo">
+          </div>
+          <div class="col-md-4">
+            <input
+              v-model="newGroup.members"
+              class="form-control"
+              placeholder="Nomi utenti separati da virgola"
+            >
+          </div>
+          <div class="col-md-4">
+            <input class="form-control" type="file" @change="onImageChange">
+          </div>
+        </div>
+        <div class="mt-3 d-flex justify-content-end">
+          <button class="btn btn-primary" :disabled="creating" @click="createGroup">Crea</button>
+        </div>
+      </div>
+    </div>
 
-		<LoadingSpinner :loading="loading">
-			<div v-if="groups.length === 0" class="text-muted">Nessun gruppo.</div>
-			<div class="row row-cols-1 row-cols-md-2 g-3">
-				<div class="col" v-for="group in groups" :key="group.id">
-					<div class="card h-100">
-						<div class="card-body d-flex flex-column">
-							<div class="d-flex align-items-center justify-content-between">
-								<h5 class="card-title mb-0">{{ group.name || group.id }}</h5>
-								<RouterLink :to="`/groups/${group.id}`" class="btn btn-sm btn-primary">Apri</RouterLink>
-							</div>
-							<p class="text-muted small mt-2 mb-1">Partecipanti: {{ formatMembers(group) }}</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</LoadingSpinner>
-	</div>
+    <LoadingSpinner :loading="loading">
+      <div v-if="groups.length === 0" class="text-muted">Nessun gruppo.</div>
+      <div class="row row-cols-1 row-cols-md-2 g-3">
+        <div v-for="group in groups" :key="group.id" class="col">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">{{ group.name || group.id }}</h5>
+                <RouterLink :to="`/groups/${group.id}`" class="btn btn-sm btn-primary">Apri</RouterLink>
+              </div>
+              <p class="text-muted small mt-2 mb-1">Partecipanti: {{ formatMembers(group) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </LoadingSpinner>
+  </div>
 </template>

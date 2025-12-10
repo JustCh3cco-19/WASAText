@@ -51,31 +51,31 @@ export default {
 </script>
 
 <template>
-	<div class="py-4">
-		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-			<h1 class="h3 mb-0">Profilo</h1>
-		</div>
+  <div class="py-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <h1 class="h3 mb-0">Profilo</h1>
+    </div>
 
-		<ErrorMsg v-if="errormsg" :msg="errormsg" />
+    <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
-		<div class="card">
-			<div class="card-body">
-				<h5 class="card-title">Impostazioni</h5>
-				<div class="mb-3">
-					<label class="form-label">Nome</label>
-					<div class="input-group">
-						<input class="form-control" v-model="newName" />
-						<button class="btn btn-primary" :disabled="updatingName" @click="updateName">Aggiorna</button>
-					</div>
-				</div>
-				<div class="mb-3">
-					<label class="form-label">Foto</label>
-					<input ref="photoInput" class="form-control" type="file" @change="onPhotoChange" />
-					<div class="mt-2">
-						<button class="btn btn-secondary" :disabled="updatingPhoto" @click="updatePhoto">Aggiorna foto</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Impostazioni</h5>
+        <div class="mb-3">
+          <label class="form-label">Nome</label>
+          <div class="input-group">
+            <input v-model="newName" class="form-control">
+            <button class="btn btn-primary" :disabled="updatingName" @click="updateName">Aggiorna</button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Foto</label>
+          <input ref="photoInput" class="form-control" type="file" @change="onPhotoChange">
+          <div class="mt-2">
+            <button class="btn btn-secondary" :disabled="updatingPhoto" @click="updatePhoto">Aggiorna foto</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
