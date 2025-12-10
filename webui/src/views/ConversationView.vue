@@ -1,6 +1,7 @@
 <script>
 import api from "../services/api.js";
 import {fileToBase64} from "../services/files.js";
+import sessionStore from "../services/sessionStore.js";
 
 export default {
 	props: {
@@ -120,6 +121,10 @@ export default {
 			if (!ts) return "";
 			return new Date(ts).toLocaleString();
 		},
+		isOwnMessage(message) {
+			const currentUserId = sessionStore.state.user?.id;
+			return !!currentUserId && message?.senderId === currentUserId;
+		},
 	},
 };
 </script>
@@ -167,7 +172,14 @@ export default {
               <button class="btn btn-outline-secondary" title="Inoltra" @click="forwardMessage(message)">Inoltra</button>
               <button class="btn btn-outline-secondary" title="Commenta" @click="commentMessage(message)">Commenta</button>
               <button class="btn btn-outline-secondary" title="Togli commento" @click="deleteComment(message)">Uncomment</button>
-              <button class="btn btn-outline-danger" title="Elimina" @click="deleteMessage(message)">Elimina</button>
+              <button
+                v-if="isOwnMessage(message)"
+                class="btn btn-outline-danger"
+                title="Elimina"
+                @click="deleteMessage(message)"
+              >
+                Elimina
+              </button>
             </div>
           </div>
           <p class="mb-1">{{ message.content }}</p>

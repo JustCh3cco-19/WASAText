@@ -2,50 +2,110 @@ package database
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
 
-func (db *appdbimpl) EnsureUserByName(ctx context.Context, name string) (User, error) {
+const (
+	minPasswordLength = 6
+	maxPasswordLength = 128
+)
+
+func (db *appdbimpl) LoginUser(ctx context.Context, name, password string) (User, string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return User{}, ErrBadRequest
+	password = strings.TrimSpace(password)
+	if name == "" || password == "" || len(password) < minPasswordLength || len(password) > maxPasswordLength {
+		return User{}, "", ErrBadRequest
+	}
+	if len(name) < 3 || len(name) > 16 {
+		return User{}, "", ErrBadRequest
 	}
 
 	tx, err := db.c.BeginTx(ctx, nil)
 	if err != nil {
-		return User{}, fmt.Errorf("begin tx: %w", err)
+		return User{}, "", fmt.Errorf("begin tx: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer func() { _ = tx.Rollback() }()
 
-	user, err := scanUser(tx.QueryRowContext(ctx, `SELECT id, name, photo FROM users WHERE name = ?`, name))
-	if err == nil {
-		if err = tx.Commit(); err != nil {
-			return User{}, fmt.Errorf("commit tx: %w", err)
+	var (
+		user User
+		hash string
+		salt string
+	)
+	err = tx.QueryRowContext(ctx, `SELECT id, name, photo, password_hash, password_salt FROM users WHERE name = ?`, name).
+		Scan(&user.ID, &user.Name, &user.Photo, &hash, &salt)
+	switch {
+	case err == nil:
+		if hash == "" || salt == "" {
+			token, err := db.initializePassword(ctx, tx, user.ID, password)
+			if err != nil {
+				return User{}, "", err
+			}
+			if err := tx.Commit(); err != nil {
+				return User{}, "", fmt.Errorf("commit tx: %w", err)
+			}
+			return user, token, nil
 		}
-		return user, nil
+		if !passwordMatches(hash, salt, password) {
+			return User{}, "", ErrUnauthorized
+		}
+		token, err := db.rotateToken(ctx, tx, user.ID)
+		if err != nil {
+			return User{}, "", err
+		}
+		if err := tx.Commit(); err != nil {
+			return User{}, "", fmt.Errorf("commit tx: %w", err)
+		}
+		return user, token, nil
+	case errors.Is(err, sql.ErrNoRows):
+		userID, err := generateNonEmptyIdentifier()
+		if err != nil {
+			return User{}, "", err
+		}
+		token, err := generateNonEmptyIdentifier()
+		if err != nil {
+			return User{}, "", err
+		}
+		salt, err := generateNonEmptyIdentifier()
+		if err != nil {
+			return User{}, "", err
+		}
+		hash := hashPassword(password, salt)
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		_, err = tx.ExecContext(ctx, `INSERT INTO users (id, name, photo, password_hash, password_salt, auth_token, created_at) VALUES (?, ?, '', ?, ?, ?, ?)`,
+			userID, name, hash, salt, token, now)
+		if err != nil {
+			if sqliteIsConstraint(err) {
+				return User{}, "", ErrConflict
+			}
+			return User{}, "", fmt.Errorf("insert user: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return User{}, "", fmt.Errorf("commit tx: %w", err)
+		}
+		return User{ID: userID, Name: name, Photo: ""}, token, nil
+	default:
+		return User{}, "", fmt.Errorf("query user: %w", err)
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return User{}, fmt.Errorf("query user: %w", err)
-	}
+}
 
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	userID := generateIdentifier()
-	if userID == "" {
-		return User{}, fmt.Errorf("generate user id")
+func (db *appdbimpl) GetUserByToken(ctx context.Context, token string) (User, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return User{}, ErrUnauthorized
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO users (id, name, photo, created_at) VALUES (?, ?, '', ?)`, userID, name, now); err != nil {
-		return User{}, fmt.Errorf("insert user: %w", err)
-	}
-
-	user = User{ID: userID, Name: name, Photo: ""}
-	if err := tx.Commit(); err != nil {
-		return User{}, fmt.Errorf("commit tx: %w", err)
+	user, err := scanUser(db.c.QueryRowContext(ctx, `SELECT id, name, photo FROM users WHERE auth_token = ?`, token))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrUnauthorized
+		}
+		return User{}, fmt.Errorf("query user by token: %w", err)
 	}
 	return user, nil
 }
@@ -140,4 +200,55 @@ func scanUser(row *sql.Row) (User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.Name, &u.Photo)
 	return u, err
+}
+
+func (db *appdbimpl) initializePassword(ctx context.Context, tx *sql.Tx, userID, password string) (string, error) {
+	salt, err := generateNonEmptyIdentifier()
+	if err != nil {
+		return "", err
+	}
+	token, err := generateNonEmptyIdentifier()
+	if err != nil {
+		return "", err
+	}
+	hash := hashPassword(password, salt)
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = ?, password_salt = ?, auth_token = ? WHERE id = ?`, hash, salt, token, userID); err != nil {
+		return "", fmt.Errorf("set password: %w", err)
+	}
+	return token, nil
+}
+
+func (db *appdbimpl) rotateToken(ctx context.Context, tx *sql.Tx, userID string) (string, error) {
+	token, err := generateNonEmptyIdentifier()
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET auth_token = ? WHERE id = ?`, token, userID); err != nil {
+		return "", fmt.Errorf("rotate token: %w", err)
+	}
+	return token, nil
+}
+
+func generateNonEmptyIdentifier() (string, error) {
+	id := generateIdentifier()
+	if id == "" {
+		return "", fmt.Errorf("generate identifier")
+	}
+	return id, nil
+}
+
+func hashPassword(password, salt string) string {
+	sum := sha256.Sum256([]byte(salt + ":" + password))
+	return hex.EncodeToString(sum[:])
+}
+
+func passwordMatches(hash, salt, password string) bool {
+	expected := hashPassword(password, salt)
+	if len(expected) != len(hash) {
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(hash), []byte(expected)) == 1 {
+		return true
+	}
+	return false
 }

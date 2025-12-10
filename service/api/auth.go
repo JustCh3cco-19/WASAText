@@ -46,7 +46,7 @@ func (rt *_router) authenticate(r *http.Request) (database.User, error) {
 	if token == "" {
 		return database.User{}, errInvalidToken
 	}
-	user, err := rt.db.GetUserByID(r.Context(), token)
+	user, err := rt.db.GetUserByToken(r.Context(), token)
 	if err != nil {
 		return database.User{}, err
 	}
@@ -60,6 +60,8 @@ func (rt *_router) handleAuthError(w http.ResponseWriter, ctx reqcontext.Request
 	case errors.Is(err, errInvalidToken):
 		writeError(w, http.StatusUnauthorized, "Invalid authentication token")
 	case errors.Is(err, database.ErrNotFound):
+		writeError(w, http.StatusUnauthorized, "Invalid or missing authentication token")
+	case errors.Is(err, database.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "Invalid or missing authentication token")
 	default:
 		ctx.Logger.WithError(err).Error("authentication error")

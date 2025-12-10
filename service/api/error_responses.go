@@ -21,6 +21,8 @@ func (rt *_router) respondDBError(w http.ResponseWriter, ctx reqcontext.RequestC
 		writeError(w, http.StatusConflict, "Conflict")
 	case errors.Is(err, database.ErrBadRequest):
 		writeError(w, http.StatusBadRequest, "Invalid request data")
+	case errors.Is(err, database.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 	default:
 		ctx.Logger.WithError(err).Error("internal server error")
 		writeError(w, http.StatusInternalServerError, "Internal server error")

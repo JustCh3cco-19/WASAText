@@ -1,8 +1,18 @@
 import {reactive} from "vue";
 
+let storedUser = null;
+try {
+	const raw = localStorage.getItem("user");
+	if (raw) {
+		storedUser = JSON.parse(raw);
+	}
+} catch (e) {
+	storedUser = null;
+}
+
 const state = reactive({
 	token: localStorage.getItem("token") || null,
-	user: null,
+	user: storedUser,
 });
 
 function setToken(token) {
@@ -15,12 +25,17 @@ function setToken(token) {
 }
 
 function setUser(user) {
-	state.user = user;
+	state.user = user || null;
+	if (user) {
+		localStorage.setItem("user", JSON.stringify(user));
+	} else {
+		localStorage.removeItem("user");
+	}
 }
 
 function logout() {
 	setToken(null);
-	state.user = null;
+	setUser(null);
 }
 
 function isAuthenticated() {

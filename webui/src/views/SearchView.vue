@@ -1,6 +1,5 @@
 <script>
 import api from "../services/api.js";
-import sessionStore from "../services/sessionStore.js";
 
 export default {
 	data() {
@@ -32,8 +31,7 @@ export default {
 			this.errormsg = null;
 			this.loading = true;
 			try {
-				const senderId = sessionStore.state.token;
-				const conv = await api.startConversation(senderId, userId);
+				const conv = await api.startConversation(userId);
 				if (conv?.id) {
 					this.$router.push(`/conversations/${conv.id}`);
 				}

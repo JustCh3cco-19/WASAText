@@ -3,8 +3,8 @@ import axios from "./axios.js";
 const defaultHeaders = (contentType) => contentType ? {"Content-Type": contentType} : {};
 
 export default {
-	async login(name) {
-		const {data} = await axios.post("/session", {name});
+	async login(name, password) {
+		const {data} = await axios.post("/session", {name, password});
 		return data;
 	},
 
@@ -13,8 +13,8 @@ export default {
 		return data;
 	},
 
-	async startConversation(senderId, recipientId) {
-		const {data} = await axios.post("/conversations", {senderId, recipientId});
+	async startConversation(recipientId) {
+		const {data} = await axios.post("/conversations", {recipientId});
 		return data;
 	},
 

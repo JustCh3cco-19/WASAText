@@ -28,25 +28,19 @@ func (rt *_router) handleListConversations(w http.ResponseWriter, r *http.Reques
 
 func (rt *_router) handleStartConversation(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	var payload struct {
-		SenderID    string `json:"senderId"`
 		RecipientID string `json:"recipientId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
 		return
 	}
-	payload.SenderID = strings.TrimSpace(payload.SenderID)
 	payload.RecipientID = strings.TrimSpace(payload.RecipientID)
-	if payload.SenderID == "" || payload.RecipientID == "" {
-		writeError(w, http.StatusBadRequest, "Sender and recipient are required")
-		return
-	}
-	if payload.SenderID != ctx.AuthenticatedUser.ID {
-		writeError(w, http.StatusForbidden, "Sender does not match authenticated user")
+	if payload.RecipientID == "" {
+		writeError(w, http.StatusBadRequest, "Recipient is required")
 		return
 	}
 
-	details, err := rt.db.EnsureDirectConversation(r.Context(), payload.SenderID, payload.RecipientID)
+	details, err := rt.db.EnsureDirectConversation(r.Context(), ctx.AuthenticatedUser.ID, payload.RecipientID)
 	if err != nil {
 		rt.respondDBError(w, ctx, err, "")
 		return

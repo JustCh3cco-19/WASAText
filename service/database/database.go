@@ -12,7 +12,8 @@ import (
 type AppDatabase interface {
 	Ping() error
 
-	EnsureUserByName(ctx context.Context, name string) (User, error)
+	LoginUser(ctx context.Context, name, password string) (User, string, error)
+	GetUserByToken(ctx context.Context, token string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	UpdateUserPhoto(ctx context.Context, id, photo string) (User, error)
 	UpdateUserName(ctx context.Context, id, name string) (User, error)
@@ -58,6 +59,9 @@ func New(db *sql.DB) (AppDatabase, error) {
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
 			photo TEXT NOT NULL DEFAULT '',
+			password_hash TEXT NOT NULL DEFAULT '',
+			password_salt TEXT NOT NULL DEFAULT '',
+			auth_token TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS conversations (
@@ -111,6 +115,13 @@ func New(db *sql.DB) (AppDatabase, error) {
 		}
 	}
 
+	if err := ensureUserColumns(db); err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_token ON users(auth_token) WHERE auth_token != ''`); err != nil {
+		return nil, fmt.Errorf("create auth token index: %w", err)
+	}
+
 	return &appdbimpl{
 		c: db,
 	}, nil
@@ -135,4 +146,53 @@ func (db *appdbimpl) sanitizeMembers(ids []string) []string {
 		res = append(res, id)
 	}
 	return res
+}
+
+func ensureUserColumns(db *sql.DB) error {
+	rows, err := db.Query(`PRAGMA table_info(users)`)
+	if err != nil {
+		return fmt.Errorf("inspect users table: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	existing := make(map[string]struct{})
+	for rows.Next() {
+		var (
+			cid      int
+			name     string
+			colType  string
+			notNull  int
+			defaultV interface{}
+			primary  int
+		)
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultV, &primary); err != nil {
+			return fmt.Errorf("scan users column: %w", err)
+		}
+		// Values are not needed beyond existence check.
+		_ = cid
+		_ = colType
+		_ = notNull
+		_ = defaultV
+		_ = primary
+		existing[name] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate users columns: %w", err)
+	}
+
+	required := map[string]string{
+		"password_hash": "TEXT NOT NULL DEFAULT ''",
+		"password_salt": "TEXT NOT NULL DEFAULT ''",
+		"auth_token":    "TEXT NOT NULL DEFAULT ''",
+	}
+	for name, definition := range required {
+		if _, ok := existing[name]; ok {
+			continue
+		}
+		stmt := fmt.Sprintf(`ALTER TABLE users ADD COLUMN %s %s`, name, definition)
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("add column %s: %w", name, err)
+		}
+	}
+	return nil
 }

@@ -75,8 +75,9 @@ export default {
 			this.errormsg = null;
 			try {
 				const memberIds = await this.resolveMemberIds(this.newGroup.members);
-				if (sessionStore.state.token && !memberIds.includes(sessionStore.state.token)) {
-					memberIds.push(sessionStore.state.token);
+				const currentUserId = sessionStore.state.user?.id;
+				if (currentUserId && !memberIds.includes(currentUserId)) {
+					memberIds.push(currentUserId);
 				}
 				const payload = {
 					name: this.newGroup.name.trim(),
