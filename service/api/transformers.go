@@ -32,6 +32,7 @@ type conversationSummaryResponse struct {
 	ID                string           `json:"id"`
 	Name              string           `json:"name"`
 	Members           []string         `json:"members"`
+	MemberDetails     []userResponse   `json:"memberDetails"`
 	ConversationPhoto string           `json:"conversationPhoto"`
 	LastMessage       *messageResponse `json:"lastMessage,omitempty"`
 }
@@ -40,16 +41,18 @@ type conversationDetailsResponse struct {
 	ID                string            `json:"id"`
 	Name              string            `json:"name"`
 	Members           []string          `json:"members"`
+	MemberDetails     []userResponse    `json:"memberDetails"`
 	ConversationPhoto string            `json:"conversationPhoto"`
 	LastMessage       *messageResponse  `json:"lastMessage,omitempty"`
 	Messages          []messageResponse `json:"messages"`
 }
 
 type groupResponse struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Members    []string `json:"members"`
-	GroupPhoto string   `json:"groupPhoto"`
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Members       []string       `json:"members"`
+	MemberDetails []userResponse `json:"memberDetails"`
+	GroupPhoto    string         `json:"groupPhoto"`
 }
 
 func toUserResponse(user database.User) userResponse {
@@ -58,6 +61,17 @@ func toUserResponse(user database.User) userResponse {
 		Name:  user.Name,
 		Photo: user.Photo,
 	}
+}
+
+func toUserResponses(users []database.User) []userResponse {
+	if len(users) == 0 {
+		return []userResponse{}
+	}
+	res := make([]userResponse, 0, len(users))
+	for _, u := range users {
+		res = append(res, toUserResponse(u))
+	}
+	return res
 }
 
 func toMessageResponse(msg database.Message) messageResponse {
@@ -88,6 +102,7 @@ func toConversationSummaryResponse(summary database.ConversationSummary) convers
 		ID:                summary.Conversation.ID,
 		Name:              summary.Conversation.Name,
 		Members:           safeStringSlice(summary.Conversation.Members),
+		MemberDetails:     toUserResponses(summary.Conversation.MembersInfo),
 		ConversationPhoto: summary.Conversation.Photo,
 		LastMessage:       last,
 	}
@@ -98,6 +113,7 @@ func toConversationDetailsResponse(details database.ConversationDetails) convers
 		ID:                details.Conversation.ID,
 		Name:              details.Conversation.Name,
 		Members:           safeStringSlice(details.Conversation.Members),
+		MemberDetails:     toUserResponses(details.Conversation.MembersInfo),
 		ConversationPhoto: details.Conversation.Photo,
 		Messages:          make([]messageResponse, 0, len(details.Messages)),
 	}
@@ -112,11 +128,16 @@ func toConversationDetailsResponse(details database.ConversationDetails) convers
 }
 
 func toGroupResponse(gr database.Group) groupResponse {
+	details := make([]userResponse, 0, len(gr.MembersInfo))
+	for _, u := range gr.MembersInfo {
+		details = append(details, toUserResponse(u))
+	}
 	return groupResponse{
-		ID:         gr.ID,
-		Name:       gr.Name,
-		Members:    safeStringSlice(gr.Members),
-		GroupPhoto: gr.Photo,
+		ID:            gr.ID,
+		Name:          gr.Name,
+		Members:       safeStringSlice(gr.Members),
+		MemberDetails: details,
+		GroupPhoto:    gr.Photo,
 	}
 }
 

@@ -212,14 +212,16 @@ func (db *appdbimpl) loadConversationUsers(ctx context.Context, conversationIDs 
 
 func (db *appdbimpl) buildConversationForViewer(row conversationRow, users []User, viewerID string) Conversation {
 	conv := Conversation{
-		ID:      row.ID,
-		Name:    row.Name,
-		Photo:   row.Photo,
-		IsGroup: row.IsGroup,
-		Members: nil,
+		ID:          row.ID,
+		Name:        row.Name,
+		Photo:       row.Photo,
+		IsGroup:     row.IsGroup,
+		Members:     nil,
+		MembersInfo: nil,
 	}
 	for _, u := range users {
 		conv.Members = append(conv.Members, u.ID)
+		conv.MembersInfo = append(conv.MembersInfo, u)
 	}
 
 	if row.IsGroup {

@@ -11,11 +11,12 @@ type User struct {
 
 // Conversation describes a chat container.
 type Conversation struct {
-	ID      string
-	Name    string
-	Photo   string
-	Members []string
-	IsGroup bool
+	ID          string
+	Name        string
+	Photo       string
+	Members     []string
+	MembersInfo []User
+	IsGroup     bool
 }
 
 // ConversationSummary exposes a conversation with its last message if available.
@@ -65,8 +66,9 @@ type NewMessage struct {
 
 // Group is a shortcut for a conversation with is_group == true.
 type Group struct {
-	ID      string
-	Name    string
-	Members []string
-	Photo   string
+	ID          string
+	Name        string
+	Members     []string
+	MembersInfo []User
+	Photo       string
 }

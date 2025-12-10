@@ -87,6 +87,7 @@ func (db *appdbimpl) ListGroups(ctx context.Context, userID string) ([]Group, er
 		users := memberMap[groups[i].ID]
 		for _, u := range users {
 			groups[i].Members = append(groups[i].Members, u.ID)
+			groups[i].MembersInfo = append(groups[i].MembersInfo, u)
 		}
 	}
 	return groups, nil
@@ -227,6 +228,7 @@ func (db *appdbimpl) buildGroup(ctx context.Context, groupID string) (Group, err
 	}
 	for _, u := range memberMap[groupID] {
 		g.Members = append(g.Members, u.ID)
+		g.MembersInfo = append(g.MembersInfo, u)
 	}
 	return g, nil
 }

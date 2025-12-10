@@ -12,7 +12,7 @@ export default {
 			updatingName: false,
 			newName: "",
 			addingUser: false,
-			newUserId: "",
+			newUserQuery: "",
 			updatingPhoto: false,
 		};
 	},
@@ -54,16 +54,45 @@ export default {
 			}
 			this.updatingPhoto = false;
 		},
+		async resolveUserId(query) {
+			const trimmed = (query || "").trim();
+			if (!trimmed) {
+				throw new Error("Inserisci un nome utente");
+			}
+			// Try to resolve by name (preferred). If nothing matches and looks like an ID, fall back.
+			try {
+				const res = await api.searchUsers(trimmed);
+				const users = res.users || [];
+				const exact = users.find(
+					(u) =>
+						(u.name && u.name.toLowerCase() === trimmed.toLowerCase()) ||
+						u.id === trimmed
+				);
+				if (exact) {
+					return exact.id;
+				}
+				if (users.length === 1) {
+					return users[0].id;
+				}
+			} catch (err) {
+				// ignore and try fallback
+			}
+			if (/^[a-zA-Z0-9_-]{8,}$/.test(trimmed)) {
+				return trimmed;
+			}
+			throw new Error(`Utente "${trimmed}" non trovato`);
+		},
 		async addUser() {
-			if (!this.newUserId.trim()) return;
+			if (!this.newUserQuery.trim()) return;
 			this.addingUser = true;
 			this.errormsg = null;
 			try {
-				await api.addToGroup(this.id, this.newUserId.trim());
-				this.newUserId = "";
+				const userId = await this.resolveUserId(this.newUserQuery);
+				await api.addToGroup(this.id, userId);
+				this.newUserQuery = "";
 				await this.refresh();
 			} catch (e) {
-				this.errormsg = e?.response?.data?.error || e.toString();
+				this.errormsg = e?.response?.data?.error || e.message || e.toString();
 			}
 			this.addingUser = false;
 		},
@@ -78,6 +107,13 @@ export default {
 				this.errormsg = e?.response?.data?.error || e.toString();
 			}
 			this.loading = false;
+		},
+		memberList() {
+			if (this.group?.memberDetails?.length) {
+				return this.group.memberDetails;
+			}
+			const count = (this.group?.members || []).length;
+			return Array.from({length: count}, (_, idx) => ({name: `Membro ${idx + 1}`}));
 		},
 	},
 	watch: {
@@ -127,7 +163,12 @@ export default {
 						<div class="col-md-6">
 							<label class="form-label">Aggiungi utente</label>
 							<div class="input-group">
-								<input class="form-control" placeholder="User ID" v-model="newUserId" />
+								<input
+									class="form-control"
+									placeholder="Nome utente"
+									v-model="newUserQuery"
+									@keyup.enter="addUser"
+								/>
 								<button class="btn btn-secondary" :disabled="addingUser" @click="addUser">Aggiungi</button>
 							</div>
 						</div>
@@ -139,10 +180,10 @@ export default {
 				<div class="card-body">
 					<h5 class="card-title">Membri</h5>
 					<div class="list-group">
-						<div v-for="member in group?.members || []" :key="member" class="list-group-item">
-							{{ member }}
+						<div v-for="member in memberList()" :key="member.id || member" class="list-group-item">
+							<strong>{{ member.name || member.id }}</strong>
 						</div>
-						<div v-if="!group?.members?.length" class="text-muted">Nessun membro.</div>
+						<div v-if="memberList().length === 0" class="text-muted">Nessun membro.</div>
 					</div>
 				</div>
 			</div>

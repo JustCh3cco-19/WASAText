@@ -8,10 +8,28 @@ export default {
 			conversations: [],
 			errormsg: null,
 			loading: false,
-			newRecipientId: "",
+			searchQuery: "",
+			searchResults: [],
+			searching: false,
+			hasSearched: false,
 		};
 	},
 	methods: {
+		participantsLabel(conv) {
+			const details = conv?.memberDetails || [];
+			const names = details.map((u) => u?.name).filter(Boolean);
+			if (names.length) {
+				return names.join(", ");
+			}
+			if (details.length) {
+				return `${details.length} membri`;
+			}
+			const memberCount = (conv?.members || []).length;
+			if (memberCount) {
+				return `${memberCount} membri`;
+			}
+			return "Partecipanti non disponibili";
+		},
 		async refresh() {
 			this.loading = true;
 			this.errormsg = null;
@@ -23,16 +41,33 @@ export default {
 			}
 			this.loading = false;
 		},
-		async startConversation() {
-			if (!this.newRecipientId.trim()) {
+		async searchUsers() {
+			const query = this.searchQuery.trim();
+			if (!query) {
+				this.searchResults = [];
+				this.hasSearched = false;
+				return;
+			}
+			this.searching = true;
+			this.errormsg = null;
+			try {
+				const res = await api.searchUsers(query);
+				this.searchResults = res.users || [];
+				this.hasSearched = true;
+			} catch (e) {
+				this.errormsg = e?.response?.data?.error || e.toString();
+			}
+			this.searching = false;
+		},
+		async startConversation(recipientId) {
+			if (!recipientId) {
 				return;
 			}
 			this.loading = true;
 			this.errormsg = null;
 			try {
 				const senderId = sessionStore.state.token;
-				const res = await api.startConversation(senderId, this.newRecipientId.trim());
-				this.newRecipientId = "";
+				const res = await api.startConversation(senderId, recipientId);
 				await this.refresh();
 				if (res?.id) {
 					this.$router.push(`/conversations/${res.id}`);
@@ -59,13 +94,37 @@ export default {
 			<h1 class="h3 mb-0">Conversazioni</h1>
 			<div class="btn-toolbar">
 				<div class="input-group input-group-sm">
-					<input class="form-control" placeholder="ID destinatario" v-model="newRecipientId" />
-					<button class="btn btn-outline-primary" @click="startConversation">Nuova chat</button>
+					<input
+						class="form-control"
+						placeholder="Cerca per nome utente"
+						v-model="searchQuery"
+						@keyup.enter="searchUsers"
+					/>
+					<button class="btn btn-outline-primary" @click="searchUsers">Cerca</button>
 				</div>
 			</div>
 		</div>
 
 		<ErrorMsg v-if="errormsg" :msg="errormsg" />
+
+		<LoadingSpinner :loading="searching">
+			<div v-if="searchResults.length === 0 && hasSearched && !searching" class="text-muted mb-3">
+				Nessun utente trovato.
+			</div>
+			<div v-if="searchResults.length" class="list-group mb-3">
+				<div
+					class="list-group-item d-flex justify-content-between align-items-center"
+					v-for="user in searchResults"
+					:key="user.id"
+				>
+					<div>
+						<strong>{{ user.name || user.id }}</strong>
+						<span class="text-muted small ms-2">{{ user.id }}</span>
+					</div>
+					<button class="btn btn-sm btn-outline-primary" @click="startConversation(user.id)">Apri chat</button>
+				</div>
+			</div>
+		</LoadingSpinner>
 
 		<LoadingSpinner :loading="loading">
 			<div v-if="conversations.length === 0" class="text-muted">Nessuna conversazione.</div>
@@ -77,7 +136,7 @@ export default {
 								<h5 class="card-title mb-0">{{ conv.name || conv.id }}</h5>
 								<RouterLink :to="`/conversations/${conv.id}`" class="btn btn-sm btn-primary">Apri</RouterLink>
 							</div>
-							<p class="text-muted small mt-2 mb-1">Partecipanti: {{ (conv.members || []).join(", ") }}</p>
+							<p class="text-muted small mt-2 mb-1">Partecipanti: {{ participantsLabel(conv) }}</p>
 							<p class="mb-0">{{ formatPreview(conv.lastMessage) }}</p>
 						</div>
 					</div>

@@ -33,21 +33,51 @@ export default {
 			const file = event?.target?.files?.[0];
 			this.newGroup.imageData = file ? await fileToBase64(file) : "";
 		},
+		async resolveMemberIds(rawMembers) {
+			const entries = rawMembers
+				.split(",")
+				.map((m) => m.trim())
+				.filter(Boolean);
+			if (entries.length === 0) {
+				return [];
+			}
+			const ids = [];
+			for (const entry of entries) {
+				try {
+					const res = await api.searchUsers(entry);
+					const users = res.users || [];
+					const match = users.find(
+						(u) =>
+							(u.name && u.name.toLowerCase() === entry.toLowerCase()) ||
+							u.id === entry
+					);
+					if (!match) {
+						throw new Error(`Utente "${entry}" non trovato`);
+					}
+					ids.push(match.id);
+				} catch (err) {
+					throw new Error(err?.response?.data?.error || `Utente "${entry}" non trovato`);
+				}
+			}
+			// Deduplicate keeping order
+			return ids.filter((id, idx) => ids.indexOf(id) === idx);
+		},
 		async createGroup() {
 			if (!this.newGroup.name.trim()) return;
+			if (!this.newGroup.imageData) {
+				this.errormsg = "Seleziona un'immagine per il gruppo";
+				return;
+			}
 			this.creating = true;
 			this.errormsg = null;
 			try {
-				const membersArray = this.newGroup.members
-					.split(",")
-					.map((m) => m.trim())
-					.filter(Boolean);
-				if (sessionStore.state.token && !membersArray.includes(sessionStore.state.token)) {
-					membersArray.push(sessionStore.state.token);
+				const memberIds = await this.resolveMemberIds(this.newGroup.members);
+				if (sessionStore.state.token && !memberIds.includes(sessionStore.state.token)) {
+					memberIds.push(sessionStore.state.token);
 				}
 				const payload = {
 					name: this.newGroup.name.trim(),
-					membersJson: JSON.stringify(membersArray),
+					membersJson: JSON.stringify(memberIds),
 					image: this.newGroup.imageData,
 				};
 				const created = await api.createGroup(payload);
@@ -57,9 +87,19 @@ export default {
 					this.$router.push(`/groups/${created.id}`);
 				}
 			} catch (e) {
-				this.errormsg = e?.response?.data?.error || e.toString();
+				this.errormsg = e?.response?.data?.error || e.message || e.toString();
 			}
 			this.creating = false;
+		},
+		formatMembers(group) {
+			if (group?.memberDetails?.length) {
+				const names = group.memberDetails.map((u) => u?.name).filter(Boolean);
+				if (names.length) return names.join(", ");
+				return `${group.memberDetails.length} membri`;
+			}
+			const count = (group?.members || []).length;
+			if (count) return `${count} membri`;
+			return "Partecipanti non disponibili";
 		},
 	},
 	mounted() {
@@ -84,7 +124,11 @@ export default {
 						<input class="form-control" placeholder="Nome gruppo" v-model="newGroup.name" />
 					</div>
 					<div class="col-md-4">
-						<input class="form-control" placeholder="Membri separati da virgola" v-model="newGroup.members" />
+						<input
+							class="form-control"
+							placeholder="Nomi utenti separati da virgola"
+							v-model="newGroup.members"
+						/>
 					</div>
 					<div class="col-md-4">
 						<input class="form-control" type="file" @change="onImageChange" />
@@ -106,7 +150,7 @@ export default {
 								<h5 class="card-title mb-0">{{ group.name || group.id }}</h5>
 								<RouterLink :to="`/groups/${group.id}`" class="btn btn-sm btn-primary">Apri</RouterLink>
 							</div>
-							<p class="text-muted small mt-2 mb-1">Partecipanti: {{ (group.members || []).join(", ") }}</p>
+							<p class="text-muted small mt-2 mb-1">Partecipanti: {{ formatMembers(group) }}</p>
 						</div>
 					</div>
 				</div>
