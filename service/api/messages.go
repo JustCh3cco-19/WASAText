@@ -22,15 +22,15 @@ func (rt *_router) handleSendMessage(w http.ResponseWriter, r *http.Request, ps 
 		return
 	}
 	content := strings.TrimSpace(r.FormValue("content"))
-	if content == "" {
-		writeError(w, http.StatusBadRequest, "Content is required")
+	attachment := strings.TrimSpace(r.FormValue("attachment"))
+	if content == "" && attachment == "" {
+		writeError(w, http.StatusBadRequest, "Content or attachment is required")
 		return
 	}
 	if len(content) > 1000 {
 		writeError(w, http.StatusBadRequest, "Content exceeds maximum length")
 		return
 	}
-	attachment := strings.TrimSpace(r.FormValue("attachment"))
 
 	message, err := rt.db.CreateMessage(r.Context(), database.NewMessage{
 		ConversationID: conversationID,

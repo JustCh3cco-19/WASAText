@@ -62,8 +62,7 @@ export default {
       <div class="list-group">
         <div v-for="user in results" :key="user.id" class="list-group-item d-flex justify-content-between align-items-center">
           <div>
-            <strong>{{ user.name || user.id }}</strong>
-            <span class="text-muted small ms-2">{{ user.id }}</span>
+            <strong>{{ user.name || "Utente" }}</strong>
           </div>
           <button class="btn btn-sm btn-outline-primary" @click="startConversation(user.id)">Apri chat</button>
         </div>

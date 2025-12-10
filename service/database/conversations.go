@@ -285,9 +285,10 @@ func (db *appdbimpl) loadLastMessages(ctx context.Context, conversationIDs []str
 			return nil, err
 		}
 		for _, msg := range result {
-			if users, ok := reactions[msg.ID]; ok {
-				msg.ReactingUserIDs = users
-				msg.ReactionCount = len(users)
+			if rx, ok := reactions[msg.ID]; ok {
+				msg.Reactions = rx
+				msg.ReactingUserIDs = uniqueReactionUsers(rx)
+				msg.ReactionCount = len(msg.ReactingUserIDs)
 			}
 		}
 	}
@@ -342,9 +343,10 @@ func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversati
 		return nil, err
 	}
 	for i := range messages {
-		if users, ok := reactions[messages[i].ID]; ok {
-			messages[i].ReactingUserIDs = users
-			messages[i].ReactionCount = len(users)
+		if rx, ok := reactions[messages[i].ID]; ok {
+			messages[i].Reactions = rx
+			messages[i].ReactingUserIDs = uniqueReactionUsers(rx)
+			messages[i].ReactionCount = len(messages[i].ReactingUserIDs)
 		}
 	}
 
@@ -401,12 +403,12 @@ func scanMessageRow(rows *sql.Rows) (Message, error) {
 	return msg, nil
 }
 
-func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (map[string][]string, error) {
-	result := make(map[string][]string, len(messageIDs))
+func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (map[string][]Reaction, error) {
+	result := make(map[string][]Reaction, len(messageIDs))
 	if len(messageIDs) == 0 {
 		return result, nil
 	}
-	query := fmt.Sprintf(`SELECT message_id, user_id FROM message_comments WHERE message_id IN (%s) ORDER BY created_at ASC`, buildPlaceholders(len(messageIDs)))
+	query := fmt.Sprintf(`SELECT message_id, user_id, content FROM message_comments WHERE message_id IN (%s) ORDER BY created_at ASC`, buildPlaceholders(len(messageIDs)))
 	rows, err := db.c.QueryContext(ctx, query, toInterfaceSlice(messageIDs)...)
 	if err != nil {
 		return nil, fmt.Errorf("load reactions: %w", err)
@@ -414,14 +416,30 @@ func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (ma
 	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
-		var messageID, userID string
-		if err := rows.Scan(&messageID, &userID); err != nil {
+		var messageID, userID, emoji string
+		if err := rows.Scan(&messageID, &userID, &emoji); err != nil {
 			return nil, fmt.Errorf("scan reaction: %w", err)
 		}
-		result[messageID] = append(result[messageID], userID)
+		result[messageID] = append(result[messageID], Reaction{
+			Emoji:  emoji,
+			UserID: userID,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate reactions: %w", err)
 	}
 	return result, nil
+}
+
+func uniqueReactionUsers(rx []Reaction) []string {
+	seen := make(map[string]struct{})
+	var users []string
+	for _, r := range rx {
+		if _, ok := seen[r.UserID]; ok {
+			continue
+		}
+		seen[r.UserID] = struct{}{}
+		users = append(users, r.UserID)
+	}
+	return users
 }

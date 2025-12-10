@@ -3,8 +3,8 @@ import axios from "./axios.js";
 const defaultHeaders = (contentType) => contentType ? {"Content-Type": contentType} : {};
 
 export default {
-	async login(name, password) {
-		const {data} = await axios.post("/session", {name, password});
+	async login(name) {
+		const {data} = await axios.post("/session", {name});
 		return data;
 	},
 

@@ -82,6 +82,11 @@ func (db *appdbimpl) ForwardMessage(ctx context.Context, sourceConversationID, m
 		name = trimmed
 	}
 
+	status := "forwarded"
+	if strings.TrimSpace(original.Status) != "" {
+		status = strings.TrimSpace(original.Status)
+	}
+
 	return db.CreateMessage(ctx, NewMessage{
 		ConversationID:  targetConversationID,
 		SenderID:        requesterID,
@@ -92,7 +97,7 @@ func (db *appdbimpl) ForwardMessage(ctx context.Context, sourceConversationID, m
 		ReplyContent:    original.ReplyContent,
 		ReplySenderName: original.ReplySenderName,
 		ReplyAttachment: original.ReplyAttachment,
-		Status:          original.Status,
+		Status:          status,
 		Timestamp:       time.Now().UTC(),
 	})
 }
@@ -165,7 +170,8 @@ func (db *appdbimpl) getMessageByID(ctx context.Context, messageID string) (Mess
 	}
 	reactions, err := db.loadReactions(ctx, []string{msg.ID})
 	if err == nil {
-		msg.ReactingUserIDs = reactions[msg.ID]
+		msg.Reactions = reactions[msg.ID]
+		msg.ReactingUserIDs = uniqueReactionUsers(msg.Reactions)
 		msg.ReactionCount = len(msg.ReactingUserIDs)
 	}
 	return msg, nil

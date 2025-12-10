@@ -1,6 +1,7 @@
 package api
 
 import (
+	"strings"
 	"time"
 
 	"github.com/JustCh3cco-19/WASAText/service/database"
@@ -13,24 +14,32 @@ type userResponse struct {
 }
 
 type messageResponse struct {
-	ID              string   `json:"id"`
-	SenderID        string   `json:"senderId"`
-	SenderName      string   `json:"senderName"`
-	Content         string   `json:"content"`
-	Timestamp       string   `json:"timestamp"`
-	Attachment      string   `json:"attachment"`
-	ReactionCount   int      `json:"reactionCount"`
-	ReactingUserIDs []string `json:"reactingUserIds"`
-	ReplyTo         string   `json:"replyTo,omitempty"`
-	ReplyContent    string   `json:"replyContent,omitempty"`
-	ReplySenderName string   `json:"replySenderName,omitempty"`
-	ReplyAttachment string   `json:"replyAttachment,omitempty"`
-	Status          string   `json:"status,omitempty"`
+	ID              string             `json:"id"`
+	SenderID        string             `json:"senderId"`
+	SenderName      string             `json:"senderName"`
+	Content         string             `json:"content"`
+	Timestamp       string             `json:"timestamp"`
+	Attachment      string             `json:"attachment"`
+	ReactionCount   int                `json:"reactionCount"`
+	ReactingUserIDs []string           `json:"reactingUserIds"`
+	ReplyTo         string             `json:"replyTo,omitempty"`
+	ReplyContent    string             `json:"replyContent,omitempty"`
+	ReplySenderName string             `json:"replySenderName,omitempty"`
+	ReplyAttachment string             `json:"replyAttachment,omitempty"`
+	Status          string             `json:"status,omitempty"`
+	Reactions       []reactionResponse `json:"reactions"`
+}
+
+type reactionResponse struct {
+	Emoji   string   `json:"emoji"`
+	UserIDs []string `json:"userIds"`
+	Count   int      `json:"count"`
 }
 
 type conversationSummaryResponse struct {
 	ID                string           `json:"id"`
 	Name              string           `json:"name"`
+	IsGroup           bool             `json:"isGroup"`
 	Members           []string         `json:"members"`
 	MemberDetails     []userResponse   `json:"memberDetails"`
 	ConversationPhoto string           `json:"conversationPhoto"`
@@ -45,6 +54,7 @@ type conversationDetailsResponse struct {
 	ConversationPhoto string            `json:"conversationPhoto"`
 	LastMessage       *messageResponse  `json:"lastMessage,omitempty"`
 	Messages          []messageResponse `json:"messages"`
+	IsGroup           bool              `json:"isGroup"`
 }
 
 type groupResponse struct {
@@ -89,7 +99,31 @@ func toMessageResponse(msg database.Message) messageResponse {
 		ReplySenderName: msg.ReplySenderName,
 		ReplyAttachment: msg.ReplyAttachment,
 		Status:          msg.Status,
+		Reactions:       toReactionResponses(msg.Reactions),
 	}
+}
+
+func toReactionResponses(rx []database.Reaction) []reactionResponse {
+	if len(rx) == 0 {
+		return []reactionResponse{}
+	}
+	grouped := make(map[string][]string)
+	for _, r := range rx {
+		key := strings.TrimSpace(r.Emoji)
+		if key == "" {
+			key = "👍"
+		}
+		grouped[key] = append(grouped[key], r.UserID)
+	}
+	res := make([]reactionResponse, 0, len(grouped))
+	for emoji, users := range grouped {
+		res = append(res, reactionResponse{
+			Emoji:   emoji,
+			UserIDs: safeStringSlice(users),
+			Count:   len(users),
+		})
+	}
+	return res
 }
 
 func toConversationSummaryResponse(summary database.ConversationSummary) conversationSummaryResponse {
@@ -101,6 +135,7 @@ func toConversationSummaryResponse(summary database.ConversationSummary) convers
 	return conversationSummaryResponse{
 		ID:                summary.Conversation.ID,
 		Name:              summary.Conversation.Name,
+		IsGroup:           summary.Conversation.IsGroup,
 		Members:           safeStringSlice(summary.Conversation.Members),
 		MemberDetails:     toUserResponses(summary.Conversation.MembersInfo),
 		ConversationPhoto: summary.Conversation.Photo,
@@ -116,6 +151,7 @@ func toConversationDetailsResponse(details database.ConversationDetails) convers
 		MemberDetails:     toUserResponses(details.Conversation.MembersInfo),
 		ConversationPhoto: details.Conversation.Photo,
 		Messages:          make([]messageResponse, 0, len(details.Messages)),
+		IsGroup:           details.Conversation.IsGroup,
 	}
 	for _, msg := range details.Messages {
 		resp.Messages = append(resp.Messages, toMessageResponse(msg))

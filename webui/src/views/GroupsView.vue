@@ -148,7 +148,7 @@ export default {
           <div class="card h-100">
             <div class="card-body d-flex flex-column">
               <div class="d-flex align-items-center justify-content-between">
-                <h5 class="card-title mb-0">{{ group.name || group.id }}</h5>
+                <h5 class="card-title mb-0">{{ group.name || "Gruppo" }}</h5>
                 <RouterLink :to="`/groups/${group.id}`" class="btn btn-sm btn-primary">Apri</RouterLink>
               </div>
               <p class="text-muted small mt-2 mb-1">Partecipanti: {{ formatMembers(group) }}</p>

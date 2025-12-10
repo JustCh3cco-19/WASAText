@@ -38,7 +38,7 @@ function doLogout() {
             <li class="nav-item">
               <RouterLink to="/conversations" class="nav-link">
                 <svg class="feather"><use href="/feather-sprite-v4.29.0.svg#message-square" /></svg>
-                Conversazioni
+                Chat
               </RouterLink>
             </li>
             <li class="nav-item">

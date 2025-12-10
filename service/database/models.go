@@ -47,6 +47,7 @@ type Message struct {
 	Status          string
 	ReactionCount   int
 	ReactingUserIDs []string
+	Reactions       []Reaction
 }
 
 // NewMessage contains the information required to persist a new message.
@@ -62,6 +63,12 @@ type NewMessage struct {
 	ReplyAttachment string
 	Status          string
 	Timestamp       time.Time
+}
+
+// Reaction represents an emoji reaction on a message.
+type Reaction struct {
+	Emoji  string
+	UserID string
 }
 
 // Group is a shortcut for a conversation with is_group == true.
