@@ -21,7 +21,6 @@ export default {
 			attachmentData: "",
 			sending: false,
 			refreshTimer: null,
-			hoveredMessage: null,
 			openActionsFor: null,
 			forwardState: {
 				open: false,
@@ -39,6 +38,7 @@ export default {
 			immediate: true,
 			handler() {
 				this.resetComposer();
+				this.contactInfoOpen = false;
 				this.refresh();
 				this.startAutoRefresh();
 			},
@@ -64,6 +64,10 @@ export default {
 		otherInitial() {
 			const name = this.otherUser?.name || "C";
 			return name.charAt(0).toUpperCase();
+		},
+		contactStatus() {
+			const status = (this.otherUser?.status || "").trim();
+			return status || "Disponibile";
 		},
 		groupedMessages() {
 			const groups = [];
@@ -274,6 +278,10 @@ export default {
 		closeActions() {
 			this.openActionsFor = null;
 		},
+		openContactInfo() {
+			if (!this.otherUser) return;
+			this.contactInfoOpen = true;
+		},
 		scrollToBottom() {
 			const el = this.$refs.messageThread;
 			if (el && el.scrollHeight != null) {
@@ -293,12 +301,16 @@ export default {
         </div>
         <div>
           <h1 class="h4 mb-0">{{ conversation?.name || "Chat" }}</h1>
-          <p class="text-muted small mb-0">Stile WhatsApp: Info contatto per profilo.</p>
         </div>
       </div>
       <div class="btn-toolbar gap-2">
-        <button class="btn btn-outline-secondary btn-sm" @click="refresh">Aggiorna</button>
-        <button v-if="otherUser" class="btn btn-outline-primary btn-sm" @click="contactInfoOpen = true">Info contatto</button>
+        <button
+          v-if="otherUser"
+          class="btn btn-outline-primary btn-sm"
+          @click="openContactInfo"
+        >
+          Info contatto
+        </button>
       </div>
     </div>
 
@@ -314,8 +326,6 @@ export default {
             :key="message.id"
             class="message-row"
             :class="{'from-me': isOwnMessage(message)}"
-            @mouseenter="hoveredMessage = message.id"
-            @mouseleave="hoveredMessage = null"
           >
             <div class="message-bubble">
               <div class="d-flex justify-content-between align-items-center message-top">
@@ -375,7 +385,7 @@ export default {
               <div class="message-meta text-end text-muted small">
                 {{ formatTimestamp(message.timestamp) }}
               </div>
-              <div class="reaction-picker" :class="{'show': hoveredMessage === message.id}">
+              <div class="reaction-picker">
                 <button
                   v-for="emoji in emojiOptions()"
                   :key="emoji"
@@ -444,13 +454,13 @@ export default {
       </div>
 
       <div v-if="contactInfoOpen" class="forward-modal">
-        <div class="forward-dialog card shadow">
+        <div class="forward-dialog card shadow contact-dialog">
           <div class="card-body text-center">
-            <div class="avatar mx-auto mb-3" :style="otherAvatarStyle">
+            <div class="avatar mx-auto mb-3 contact-avatar" :style="otherAvatarStyle">
               <span v-if="!otherAvatarStyle.backgroundImage">{{ otherInitial }}</span>
             </div>
             <h5 class="mb-1">{{ otherUser?.name || "Contatto" }}</h5>
-            <p class="text-muted small mb-3">Profilo contatto</p>
+            <p class="text-muted small mb-3">Stato: {{ contactStatus }}</p>
             <button class="btn btn-outline-secondary btn-sm" @click="contactInfoOpen = false">Chiudi</button>
           </div>
         </div>
@@ -486,6 +496,10 @@ export default {
 
 .forward-dialog {
   width: min(520px, 95vw);
+}
+
+.contact-dialog {
+  max-width: 360px;
 }
 
 .forward-list {
@@ -583,13 +597,8 @@ export default {
 }
 
 .reaction-picker {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  margin-top: 0.25rem;
-}
-
-.reaction-picker.show {
   opacity: 1;
+  margin-top: 0.25rem;
 }
 
 .avatar {
@@ -603,5 +612,11 @@ export default {
   font-weight: 600;
   color: #6c757d;
   overflow: hidden;
+}
+
+.contact-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: 32px;
 }
 </style>

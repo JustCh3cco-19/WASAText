@@ -51,7 +51,6 @@ export default {
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
       <h1 class="h3">Login</h1>
     </div>
-    <p class="text-muted">Accedi inserendo solo il tuo nome utente: se non esiste creeremo noi un nuovo profilo, senza password.</p>
     <ErrorMsg v-if="errormsg" :msg="errormsg" />
     <LoadingSpinner :loading="loading">
       <form class="card p-3" @submit.prevent="submit">

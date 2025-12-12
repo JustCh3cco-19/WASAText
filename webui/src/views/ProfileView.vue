@@ -21,6 +21,8 @@ export default {
 			updatingName: false,
 			updatingPhoto: false,
 			status: localStorage.getItem(STATUS_KEY) || "Disponibile",
+			photoFileName: "",
+			accountSettingsOpen: false,
 		};
 	},
 	computed: {
@@ -57,11 +59,14 @@ export default {
 			this.updatingName = false;
 		},
 		async onPhotoChange(event) {
-			const file = event?.target?.files?.[0];
+			const inputEl = event?.target;
+			const file = inputEl?.files?.[0];
+			this.photoFileName = file?.name || "";
 			if (!file) {
 				this.resetPhotoCrop();
 				return;
 			}
+			if (inputEl) inputEl.value = null;
 			const reader = new FileReader();
 			reader.onload = () => {
 				this.cropSourceUrl = reader.result;
@@ -111,6 +116,15 @@ export default {
 			this.cropX = 0;
 			this.cropY = 0;
 			this.cropScale = 1;
+			this.photoFileName = "";
+			const input = this.$refs.photoInput;
+			if (input) input.value = null;
+		},
+		openAccountSettings() {
+			this.accountSettingsOpen = true;
+		},
+		closeAccountSettings() {
+			this.accountSettingsOpen = false;
 		},
 		updateStatus() {
 			this.status = this.status.trim() || "Disponibile";
@@ -134,29 +148,41 @@ export default {
           <span v-if="!avatarStyle.backgroundImage">{{ avatarInitial }}</span>
         </div>
         <h2 class="h4 mb-1">{{ displayName }}</h2>
-        <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-3">
-          <input v-model="status" class="form-control w-auto" style="min-width: 220px" maxlength="80">
+        <div class="status-updater d-flex flex-column align-items-center gap-2 mb-3">
+          <input v-model="status" class="form-control status-input" maxlength="80">
           <button class="btn btn-outline-primary btn-sm" @click="updateStatus">Aggiorna stato</button>
         </div>
-        <div class="text-muted small">Stato visibile solo a te per ora.</div>
+        <button class="btn btn-outline-secondary btn-sm" @click="openAccountSettings">
+          Impostazioni Account
+        </button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Impostazioni account</h5>
-        <div class="mb-3">
-          <label class="form-label">Nome</label>
-          <div class="input-group">
-            <input v-model="newName" class="form-control">
-            <button class="btn btn-primary" :disabled="updatingName" @click="updateName">Aggiorna</button>
+    <div v-if="accountSettingsOpen" class="settings-modal">
+      <div class="settings-dialog card shadow">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">Impostazioni Account</h5>
+            <button class="btn btn-sm btn-outline-secondary" @click="closeAccountSettings">Chiudi</button>
           </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Foto</label>
-          <div class="d-flex gap-2 align-items-center">
-            <input ref="photoInput" class="form-control" type="file" @change="onPhotoChange">
-            <span class="text-muted small">Scegli e ritaglia (popup)</span>
+          <div class="mb-3">
+            <label class="form-label">Nome</label>
+            <div class="input-group">
+              <input v-model="newName" class="form-control">
+              <button class="btn btn-primary" :disabled="updatingName" @click="updateName">Aggiorna</button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Foto</label>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <button class="btn btn-outline-secondary" type="button" @click="$refs.photoInput?.click()">
+                {{ photoFileName || "Scegli foto" }}
+              </button>
+              <span class="text-muted small">
+                {{ photoFileName ? `Selezionato: ${photoFileName}` : "Nessuna foto selezionata" }}
+              </span>
+              <input ref="photoInput" class="d-none" type="file" accept="image/*" @change="onPhotoChange">
+            </div>
           </div>
         </div>
       </div>
@@ -227,5 +253,31 @@ export default {
 
 .crop-dialog {
   width: min(720px, 95vw);
+}
+
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1045;
+}
+
+.settings-dialog {
+  width: min(640px, 95vw);
+}
+
+.status-updater {
+  max-width: 320px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.status-input {
+  min-width: 240px;
+  width: 100%;
+  text-align: center;
 }
 </style>

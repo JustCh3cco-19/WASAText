@@ -1,6 +1,6 @@
 <script>
 import api from "../services/api.js";
-import {fileToBase64} from "../services/files.js";
+import {fileToBase64, base64ImageToDataUrl} from "../services/files.js";
 import sessionStore from "../services/sessionStore.js";
 
 const DEFAULT_REACTIONS = ["👍", "❤️", "😂", "😮", "🎉"];
@@ -24,10 +24,12 @@ export default {
 			addingUser: false,
 			newUserQuery: "",
 			updatingPhoto: false,
+			photoFileName: "",
 			messageText: "",
 			attachmentData: "",
 			sending: false,
 			refreshTimer: null,
+			openActionsFor: null,
 			hoveredMessage: null,
 			forwardState: {
 				open: false,
@@ -38,11 +40,29 @@ export default {
 			},
 		};
 	},
+	computed: {
+		groupAvatarStyle() {
+			const photo = base64ImageToDataUrl(this.group?.groupPhoto || this.group?.photo || "");
+			if (photo) {
+				return {
+					backgroundImage: `url(${photo})`,
+					backgroundSize: "cover",
+					backgroundPosition: "center",
+				};
+			}
+			return {};
+		},
+		groupAvatarInitial() {
+			const name = this.group?.name || "G";
+			return name.charAt(0).toUpperCase() || "G";
+		},
+	},
 	watch: {
 		id: {
 			immediate: true,
 			handler() {
 				this.resetComposer();
+				this.photoFileName = "";
 				this.refresh();
 				this.startAutoRefresh();
 			},
@@ -50,6 +70,25 @@ export default {
 	},
 	beforeUnmount() {
 		this.stopAutoRefresh();
+	},
+	computed: {
+		groupedMessages() {
+			const groups = [];
+			const messages = this.conversation?.messages || [];
+			for (const msg of messages) {
+				const key = this.dayKey(msg.timestamp);
+				const last = groups[groups.length - 1];
+				if (!last || last.key !== key) {
+					groups.push({
+						key,
+						label: this.formatDayLabel(msg.timestamp),
+						messages: [],
+					});
+				}
+				groups[groups.length - 1].messages.push(msg);
+			}
+			return groups;
+		},
 	},
 	methods: {
 		startAutoRefresh() {
@@ -79,6 +118,8 @@ export default {
 				this.group = groupRes;
 				this.newName = this.group?.name || "";
 				this.conversation = convRes;
+				await this.$nextTick();
+				this.scrollToBottom();
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
 			}
@@ -108,18 +149,7 @@ export default {
 			this.updatingName = false;
 		},
 		async onPhotoChange(event) {
-			const file = event?.target?.files?.[0];
-			if (!file) return;
-			this.updatingPhoto = true;
-			this.errormsg = null;
-			try {
-				const base64 = await fileToBase64(file);
-				await api.updateGroupPhoto(this.id, base64, file.type || "image/png");
-				await this.refresh();
-			} catch (e) {
-				this.errormsg = e?.response?.data?.error || e.toString();
-			}
-			this.updatingPhoto = false;
+			// Gestita ora nella pagina info gruppo
 		},
 		async resolveUserId(query) {
 			const trimmed = (query || "").trim();
@@ -287,6 +317,50 @@ export default {
 		emojiOptions() {
 			return DEFAULT_REACTIONS;
 		},
+		attachmentSrc(attachment) {
+			return base64ImageToDataUrl(attachment || "");
+		},
+		isForwarded(message) {
+			return (message?.status || "").trim().toLowerCase() === "forwarded";
+		},
+		toggleActions(id) {
+			this.openActionsFor = this.openActionsFor === id ? null : id;
+		},
+		closeActions() {
+			this.openActionsFor = null;
+		},
+		dayKey(ts) {
+			const date = new Date(ts);
+			if (Number.isNaN(date.getTime())) return "";
+			return date.toISOString().slice(0, 10);
+		},
+		formatDayLabel(ts) {
+			const date = new Date(ts);
+			if (Number.isNaN(date.getTime())) return "";
+			const today = new Date();
+			const todayKey = this.dayKey(today);
+			const msgKey = this.dayKey(date);
+			if (msgKey === todayKey) return "Oggi";
+			const yesterday = new Date();
+			yesterday.setDate(today.getDate() - 1);
+			if (msgKey === this.dayKey(yesterday)) return "Ieri";
+			const startOf = (d) => {
+				const copy = new Date(d);
+				copy.setHours(0, 0, 0, 0);
+				return copy;
+			};
+			const diffDays = Math.floor((startOf(today) - startOf(date)) / (1000 * 60 * 60 * 24));
+			if (diffDays >= 3) {
+				return date.toLocaleDateString(undefined, {weekday: "long", day: "numeric", month: "short", year: "numeric"});
+			}
+			return date.toLocaleDateString(undefined, {weekday: "long", day: "numeric", month: "short"});
+		},
+		scrollToBottom() {
+			const el = this.$refs.messageThread;
+			if (el && el.scrollHeight != null) {
+				el.scrollTop = el.scrollHeight;
+			}
+		},
 	},
 };
 </script>
@@ -297,8 +371,8 @@ export default {
               <div>
                 <h1 class="h3 mb-0">{{ group?.name || "Gruppo" }}</h1>
               </div>
-              <div class="btn-toolbar">
-        <button class="btn btn-outline-secondary btn-sm me-2" @click="refresh">Refresh</button>
+              <div class="btn-toolbar gap-2">
+        <RouterLink :to="`/groups/${id}/info`" class="btn btn-outline-primary btn-sm">Info gruppo</RouterLink>
         <button class="btn btn-outline-danger btn-sm" @click="leaveGroup">Esci</button>
       </div>
     </div>
@@ -306,91 +380,117 @@ export default {
     <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
     <div class="row">
-      <div class="col-lg-7">
+      <div class="col-12">
         <LoadingSpinner :loading="loadingChat || loading">
-          <div class="card mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Chat di gruppo</h5>
-              <div class="chat-composer card shadow-sm border-0">
-                <div class="card-body">
-                  <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-light d-flex align-items-center" type="button" title="Allega" @click="$refs.attachmentInput.click()">
-                      <svg class="feather"><use href="/feather-sprite-v4.29.0.svg#paperclip" /></svg>
+          <div v-if="!groupedMessages.length" class="text-muted">Nessun messaggio.</div>
+          <div class="message-thread mb-4" ref="messageThread" @click="closeActions">
+            <div v-for="group in groupedMessages" :key="group.key" class="message-day-group">
+              <div class="date-chip">{{ group.label }}</div>
+              <div
+                v-for="message in group.messages"
+                :key="message.id"
+                class="message-row"
+                :class="{'from-me': isOwnMessage(message)}"
+              >
+                <div class="message-bubble">
+                  <div class="d-flex justify-content-between align-items-center message-top">
+                    <div class="small text-muted">
+                      <span v-if="!isOwnMessage(message)">{{ message.senderName || "Membro" }}</span>
+                      <span v-else>&nbsp;</span>
+                    </div>
+                    <div class="message-actions">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        title="Azioni"
+                        @click.stop="toggleActions(message.id)"
+                      >
+                        ...
+                      </button>
+                      <div v-if="openActionsFor === message.id" class="actions-menu card shadow-sm">
+                        <button type="button" class="dropdown-item" @click.stop="openForwardModal(message)">Inoltra</button>
+                        <button
+                          v-if="isOwnMessage(message)"
+                          type="button"
+                          class="dropdown-item text-danger"
+                          @click.stop="deleteMessage(message)"
+                        >
+                          Elimina
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="isForwarded(message)" class="forwarded-label">
+                    <span class="arrow">↪</span>
+                    <em>Messaggio inoltrato</em>
+                  </div>
+                  <div class="mb-1">
+                    <p v-if="message.content" class="mb-1">{{ message.content }}</p>
+                    <p v-else-if="message.attachment" class="mb-1 text-muted small">[Allegato]</p>
+                    <div v-if="message.attachment" class="mt-1">
+                      <img
+                        :src="attachmentSrc(message.attachment)"
+                        alt="Allegato"
+                        class="message-attachment rounded border"
+                      >
+                    </div>
+                  </div>
+                  <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
+                    <div v-if="message.reactions?.length" class="d-flex gap-2 flex-wrap">
+                      <span
+                        v-for="rx in message.reactions"
+                        :key="rx.emoji"
+                        class="badge bg-light text-dark border"
+                      >
+                        {{ rx.emoji }} {{ rx.count }}
+                      </span>
+                    </div>
+                    <span v-else>Nessuna reazione</span>
+                  </div>
+                  <div class="message-meta text-end text-muted small">
+                    {{ formatTimestamp(message.timestamp) }}
+                  </div>
+                  <div class="reaction-picker">
+                    <button
+                      v-for="emoji in emojiOptions()"
+                      :key="emoji"
+                      class="btn btn-light btn-sm"
+                      :class="{'border-primary': myReaction(message) === emoji}"
+                      @click="toggleReaction(message, emoji)"
+                      :title="`Reagisci con ${emoji}`"
+                    >
+                      {{ emoji }}
                     </button>
-                    <input ref="attachmentInput" type="file" class="d-none" @change="onAttachmentChange">
-                    <textarea
-                      v-model="messageText"
-                      class="form-control flex-fill"
-                      rows="2"
-                      placeholder="Scrivi un messaggio"
-                      @keydown="handleKeydown"
-                    />
-                    <button class="btn btn-primary" :disabled="sending" @click="sendMessage">Invia</button>
-                  </div>
-                  <div class="text-muted small mt-1">
-                    <span v-if="attachmentData">Allegato pronto per l'invio. </span>
-                    Invio con Ctrl+Invio, Invio va a capo.
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div v-if="!conversation?.messages?.length" class="text-muted">Nessun messaggio.</div>
-          <div class="list-group mb-4">
-            <div
-              v-for="message in conversation?.messages || []"
-              :key="message.id"
-              class="list-group-item message-item position-relative"
-              @mouseenter="hoveredMessage = message.id"
-              @mouseleave="hoveredMessage = null"
-            >
-              <div class="d-flex justify-content-between">
-                <div>
-                  <strong>{{ message.senderName || message.senderId }}</strong>
-                  <span class="text-muted small ms-2">{{ formatTimestamp(message.timestamp) }}</span>
-                </div>
-                <div class="btn-group btn-group-sm">
-                  <button class="btn btn-outline-secondary" title="Inoltra" @click="openForwardModal(message)">Inoltra</button>
-                  <button
-                    v-if="isOwnMessage(message)"
-                    class="btn btn-outline-danger"
-                    title="Elimina"
-                    @click="deleteMessage(message)"
-                  >
-                    Elimina
-                  </button>
-                </div>
-              </div>
-              <p class="mb-1">{{ message.content }}</p>
-              <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
-                <div v-if="message.reactions?.length" class="d-flex gap-2 flex-wrap">
-                  <span
-                    v-for="rx in message.reactions"
-                    :key="rx.emoji"
-                    class="badge bg-light text-dark border"
-                  >
-                    {{ rx.emoji }} {{ rx.count }}
-                  </span>
-                </div>
-                <span v-else>Nessuna reazione</span>
-              </div>
-              <div class="reaction-picker" :class="{'show': hoveredMessage === message.id}">
-                <button
-                  v-for="emoji in emojiOptions()"
-                  :key="emoji"
-                  class="btn btn-light btn-sm"
-                  :class="{'border-primary': myReaction(message) === emoji}"
-                  @click="toggleReaction(message, emoji)"
-                  :title="`Reagisci con ${emoji}`"
-                >
-                  {{ emoji }}
+          <div class="chat-composer card shadow-sm">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-light d-flex align-items-center" type="button" title="Allega" @click="$refs.attachmentInput.click()">
+                  <svg class="feather"><use href="/feather-sprite-v4.29.0.svg#paperclip" /></svg>
                 </button>
+                <input ref="attachmentInput" type="file" class="d-none" @change="onAttachmentChange">
+                <textarea
+                  v-model="messageText"
+                  class="form-control flex-fill"
+                  rows="2"
+                  placeholder="Scrivi un messaggio"
+                  @keydown="handleKeydown"
+                />
+                <button class="btn btn-primary" :disabled="sending" @click="sendMessage">Invia</button>
+              </div>
+              <div class="text-muted small mt-1">
+                <span v-if="attachmentData">Allegato pronto per l'invio. </span>
+                Invio con Ctrl+Invio, Invio va a capo.
               </div>
             </div>
           </div>
 
-          <div v-if="forwardState.open" class="forward-modal">
+      <div v-if="forwardState.open" class="forward-modal">
             <div class="forward-dialog card shadow">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -419,55 +519,6 @@ export default {
           </div>
         </LoadingSpinner>
       </div>
-
-      <div class="col-lg-5">
-        <LoadingSpinner :loading="loading">
-          <div class="card mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Impostazioni gruppo</h5>
-              <div class="row g-2">
-                <div class="col-md-12">
-                  <label class="form-label">Nome</label>
-                  <div class="input-group">
-                    <input v-model="newName" class="form-control">
-                    <button class="btn btn-primary" :disabled="updatingName" @click="updateName">Salva</button>
-                  </div>
-                </div>
-                <div class="col-md-12">
-                  <label class="form-label">Foto</label>
-                  <input class="form-control" type="file" :disabled="updatingPhoto" @change="onPhotoChange">
-                </div>
-              </div>
-              <div class="mt-3 row g-2">
-                <div class="col-md-12">
-                  <label class="form-label">Aggiungi utente</label>
-                  <div class="input-group">
-                    <input
-                      v-model="newUserQuery"
-                      class="form-control"
-                      placeholder="Nome utente"
-                      @keyup.enter="addUser"
-                    >
-                    <button class="btn btn-secondary" :disabled="addingUser" @click="addUser">Aggiungi</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">Membri</h5>
-              <div class="list-group">
-                <div v-for="member in memberList()" :key="member.id || member" class="list-group-item">
-                  <strong>{{ member.name || member.id }}</strong>
-                </div>
-                <div v-if="memberList().length === 0" class="text-muted">Nessun membro.</div>
-              </div>
-            </div>
-          </div>
-        </LoadingSpinner>
-      </div>
     </div>
   </div>
 </template>
@@ -477,24 +528,6 @@ export default {
   position: sticky;
   bottom: 0;
   margin-top: 0.5rem;
-}
-
-.message-item {
-  transition: background-color 0.2s ease;
-}
-
-.message-item:hover {
-  background-color: #f8f9fa;
-}
-
-.reaction-picker {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  margin-top: 0.25rem;
-}
-
-.reaction-picker.show {
-  opacity: 1;
 }
 
 .forward-modal {
@@ -514,5 +547,99 @@ export default {
 .forward-list {
   max-height: 260px;
   overflow-y: auto;
+}
+
+.message-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.message-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.date-chip {
+  position: sticky;
+  top: 0;
+  align-self: center;
+  z-index: 2;
+  padding: 4px 12px;
+  background: #e9ecef;
+  color: #495057;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: capitalize;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.message-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.message-row.from-me {
+  justify-content: flex-end;
+}
+
+.message-bubble {
+  background: #f1f3f5;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  max-width: 80%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.message-row.from-me .message-bubble {
+  background: #dcf8c6;
+}
+
+.message-attachment {
+  max-width: 220px;
+  max-height: 220px;
+  object-fit: cover;
+  display: block;
+}
+
+.message-top {
+  gap: 0.5rem;
+}
+
+.message-actions {
+  position: relative;
+  z-index: 6;
+}
+
+.actions-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 140px;
+  z-index: 7;
+}
+
+.message-meta {
+  margin-top: 0.25rem;
+}
+
+.forwarded-label {
+  color: #6c757d;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.forwarded-label .arrow {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.reaction-picker {
+  opacity: 1;
+  margin-top: 0.25rem;
 }
 </style>

@@ -5,6 +5,8 @@ import ConversationsView from '../views/ConversationsView.vue';
 import ConversationView from '../views/ConversationView.vue';
 import GroupsView from '../views/GroupsView.vue';
 import GroupView from '../views/GroupView.vue';
+import GroupInfoView from '../views/GroupInfoView.vue';
+import GroupCreateView from '../views/GroupCreateView.vue';
 import ProfileView from '../views/ProfileView.vue';
 import SearchView from '../views/SearchView.vue';
 
@@ -16,7 +18,9 @@ const router = createRouter({
 		{path: '/conversations', name: 'conversations', component: ConversationsView},
 		{path: '/conversations/:id', name: 'conversation', component: ConversationView, props: true},
 		{path: '/groups', name: 'groups', component: GroupsView},
+		{path: '/groups/new', name: 'group-create', component: GroupCreateView},
 		{path: '/groups/:id', name: 'group', component: GroupView, props: true},
+		{path: '/groups/:id/info', name: 'group-info', component: GroupInfoView, props: true},
 		{path: '/profile', name: 'profile', component: ProfileView},
 		{path: '/search', name: 'search', component: SearchView},
 		{path: '/:pathMatch(.*)*', redirect: '/conversations'},

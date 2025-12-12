@@ -53,7 +53,7 @@ export default {
     <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
     <div class="input-group mb-3">
-      <input v-model="query" class="form-control" placeholder="username" @keyup.enter="search">
+      <input v-model="query" class="form-control" placeholder="Nome Utente" @keyup.enter="search">
       <button class="btn btn-primary" @click="search">Cerca</button>
     </div>
 
