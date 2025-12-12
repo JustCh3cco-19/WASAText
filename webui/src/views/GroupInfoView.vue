@@ -287,7 +287,7 @@ export default {
                   :disabled="updatingPhoto || !photoCrop.cropped"
                   @click="updatePhoto"
                 >
-                  <span v-if="updatingPhoto" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                  <span v-if="updatingPhoto" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
                   Salva foto
                 </button>
               </div>
@@ -301,11 +301,11 @@ export default {
               </div>
               <div class="col-md-6">
                 <label class="form-label small mb-1">Zoom</label>
-                <input type="range" class="form-range" min="1" max="2.5" step="0.05" v-model.number="photoCrop.scale" @input="updateCropPreview">
+                <input v-model.number="photoCrop.scale" type="range" class="form-range" min="1" max="2.5" step="0.05" @input="updateCropPreview">
                 <label class="form-label small mb-1">Sposta orizzontale</label>
-                <input type="range" class="form-range" min="-0.5" max="0.5" step="0.02" v-model.number="photoCrop.x" @input="updateCropPreview">
+                <input v-model.number="photoCrop.x" type="range" class="form-range" min="-0.5" max="0.5" step="0.02" @input="updateCropPreview">
                 <label class="form-label small mb-1">Sposta verticale</label>
-                <input type="range" class="form-range" min="-0.5" max="0.5" step="0.02" v-model.number="photoCrop.y" @input="updateCropPreview">
+                <input v-model.number="photoCrop.y" type="range" class="form-range" min="-0.5" max="0.5" step="0.02" @input="updateCropPreview">
               </div>
             </div>
           </div>

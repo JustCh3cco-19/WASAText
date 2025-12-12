@@ -33,17 +33,6 @@ export default {
 			otherUserPhoto: "",
 		};
 	},
-	watch: {
-		id: {
-			immediate: true,
-			handler() {
-				this.resetComposer();
-				this.contactInfoOpen = false;
-				this.refresh();
-				this.startAutoRefresh();
-			},
-		},
-	},
 	computed: {
 		otherUser() {
 			if (!this.conversation?.memberDetails) return null;
@@ -85,6 +74,17 @@ export default {
 				groups[groups.length - 1].messages.push(msg);
 			}
 			return groups;
+		},
+	},
+	watch: {
+		id: {
+			immediate: true,
+			handler() {
+				this.resetComposer();
+				this.contactInfoOpen = false;
+				this.refresh();
+				this.startAutoRefresh();
+			},
 		},
 	},
 	beforeUnmount() {
@@ -318,7 +318,7 @@ export default {
 
     <LoadingSpinner :loading="loading">
       <div v-if="!groupedMessages.length" class="text-muted">Nessun messaggio.</div>
-      <div class="message-thread mb-4" ref="messageThread" @click="closeActions">
+      <div ref="messageThread" class="message-thread mb-4" @click="closeActions">
         <div v-for="group in groupedMessages" :key="group.key" class="message-day-group">
           <div class="date-chip">{{ group.label }}</div>
           <div
@@ -329,10 +329,10 @@ export default {
           >
             <div class="message-bubble">
               <div class="d-flex justify-content-between align-items-center message-top">
-                <div class="small text-muted" v-if="!isOwnMessage(message)">
+                <div v-if="!isOwnMessage(message)" class="small text-muted">
                   {{ message.senderName || "Contatto" }}
                 </div>
-                <div class="small text-muted" v-else>&nbsp;</div>
+                <div v-else class="small text-muted">&nbsp;</div>
                 <div class="message-actions">
                   <button
                     type="button"
@@ -391,8 +391,8 @@ export default {
                   :key="emoji"
                   class="btn btn-light btn-sm"
                   :class="{'border-primary': myReaction(message) === emoji}"
-                  @click="toggleReaction(message, emoji)"
                   :title="`Reagisci con ${emoji}`"
+                  @click="toggleReaction(message, emoji)"
                 >
                   {{ emoji }}
                 </button>

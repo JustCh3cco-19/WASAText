@@ -14,17 +14,17 @@ export default {
 			refreshTimer: null,
 		};
 	},
+	computed: {
+		privateChats() {
+			return (this.conversations || []).filter((c) => !c.isGroup);
+		},
+	},
 	mounted() {
 		this.refresh();
 		this.startAutoRefresh();
 	},
 	beforeUnmount() {
 		this.stopAutoRefresh();
-	},
-	computed: {
-		privateChats() {
-			return (this.conversations || []).filter((c) => !c.isGroup);
-		},
 	},
 	methods: {
 		startAutoRefresh() {

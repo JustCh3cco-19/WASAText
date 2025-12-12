@@ -57,20 +57,6 @@ export default {
 			return name.charAt(0).toUpperCase() || "G";
 		},
 	},
-	watch: {
-		id: {
-			immediate: true,
-			handler() {
-				this.resetComposer();
-				this.photoFileName = "";
-				this.refresh();
-				this.startAutoRefresh();
-			},
-		},
-	},
-	beforeUnmount() {
-		this.stopAutoRefresh();
-	},
 	computed: {
 		groupedMessages() {
 			const groups = [];
@@ -89,6 +75,20 @@ export default {
 			}
 			return groups;
 		},
+	},
+	watch: {
+		id: {
+			immediate: true,
+			handler() {
+				this.resetComposer();
+				this.photoFileName = "";
+				this.refresh();
+				this.startAutoRefresh();
+			},
+		},
+	},
+	beforeUnmount() {
+		this.stopAutoRefresh();
 	},
 	methods: {
 		startAutoRefresh() {
@@ -367,11 +367,11 @@ export default {
 
 <template>
   <div class="py-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-              <div>
-                <h1 class="h3 mb-0">{{ group?.name || "Gruppo" }}</h1>
-              </div>
-              <div class="btn-toolbar gap-2">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <div>
+        <h1 class="h3 mb-0">{{ group?.name || "Gruppo" }}</h1>
+      </div>
+      <div class="btn-toolbar gap-2">
         <RouterLink :to="`/groups/${id}/info`" class="btn btn-outline-primary btn-sm">Info gruppo</RouterLink>
         <button class="btn btn-outline-danger btn-sm" @click="leaveGroup">Esci</button>
       </div>
@@ -383,11 +383,11 @@ export default {
       <div class="col-12">
         <LoadingSpinner :loading="loadingChat || loading">
           <div v-if="!groupedMessages.length" class="text-muted">Nessun messaggio.</div>
-          <div class="message-thread mb-4" ref="messageThread" @click="closeActions">
-            <div v-for="group in groupedMessages" :key="group.key" class="message-day-group">
-              <div class="date-chip">{{ group.label }}</div>
+          <div ref="messageThread" class="message-thread mb-4" @click="closeActions">
+            <div v-for="msgGroup in groupedMessages" :key="msgGroup.key" class="message-day-group">
+              <div class="date-chip">{{ msgGroup.label }}</div>
               <div
-                v-for="message in group.messages"
+                v-for="message in msgGroup.messages"
                 :key="message.id"
                 class="message-row"
                 :class="{'from-me': isOwnMessage(message)}"
@@ -456,8 +456,8 @@ export default {
                       :key="emoji"
                       class="btn btn-light btn-sm"
                       :class="{'border-primary': myReaction(message) === emoji}"
-                      @click="toggleReaction(message, emoji)"
                       :title="`Reagisci con ${emoji}`"
+                      @click="toggleReaction(message, emoji)"
                     >
                       {{ emoji }}
                     </button>
@@ -490,7 +490,7 @@ export default {
             </div>
           </div>
 
-      <div v-if="forwardState.open" class="forward-modal">
+          <div v-if="forwardState.open" class="forward-modal">
             <div class="forward-dialog card shadow">
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
