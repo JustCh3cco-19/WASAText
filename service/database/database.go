@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const usersTable = "users"
+
 // AppDatabase is the high level interface for the DB
 type AppDatabase interface {
 	Ping() error
@@ -158,7 +160,7 @@ func (db *appdbimpl) sanitizeMembers(ids []string) []string {
 }
 
 func ensureUsersTable(db *sql.DB) error {
-	hasUsers, err := tableExists(db, "users")
+	hasUsers, err := tableExists(db, usersTable)
 	if err != nil {
 		return err
 	}
@@ -167,7 +169,7 @@ func ensureUsersTable(db *sql.DB) error {
 		return err
 	}
 
-	sourceTable := "users"
+	sourceTable := usersTable
 	if !hasUsers && hasUsersOld {
 		sourceTable = "users_old"
 	}
@@ -195,7 +197,7 @@ func ensureUsersTable(db *sql.DB) error {
 		if _, ok := existing["password_salt"]; ok {
 			needsMigration = true
 		}
-		if sourceTable != "users" {
+		if sourceTable != usersTable {
 			needsMigration = true
 		}
 	}
@@ -356,11 +358,15 @@ func needsUsersForeignKeyFix(db *sql.DB) (bool, error) {
 			_ = onDelete
 			_ = match
 			for _, col := range userColumns {
-				if from == col && refTable != "users" {
+				if from == col && refTable != usersTable {
 					_ = rows.Close()
 					return true, nil
 				}
 			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return false, fmt.Errorf("iterate foreign keys for %s: %w", table, err)
 		}
 		if err := rows.Close(); err != nil {
 			return false, fmt.Errorf("close foreign keys for %s: %w", table, err)

@@ -399,10 +399,10 @@ export default {
                   </div>
                 </div>
               </div>
-                <div v-if="isForwarded(message)" class="forwarded-label">
-                  <span class="arrow">↪</span>
-                  <em>Messaggio inoltrato</em>
-                </div>
+              <div v-if="isForwarded(message)" class="forwarded-label">
+                <span class="arrow">↪</span>
+                <em>Messaggio inoltrato</em>
+              </div>
               <div v-if="message.replyTo" class="reply-chip">
                 <div class="small text-muted">Risposta a {{ message.replySenderName || "messaggio" }}</div>
                 <div class="reply-text">

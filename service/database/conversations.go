@@ -488,7 +488,7 @@ func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (ma
 
 func uniqueReactionUsers(rx []Reaction) []string {
 	seen := make(map[string]struct{})
-	var users []string
+	users := make([]string, 0, len(rx))
 	for _, r := range rx {
 		if _, ok := seen[r.UserID]; ok {
 			continue
