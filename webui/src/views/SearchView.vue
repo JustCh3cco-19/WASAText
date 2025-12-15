@@ -8,19 +8,17 @@ export default {
 			errormsg: null,
 			loading: false,
 			results: [],
+			hasSearched: false,
 		};
 	},
 	methods: {
-		async search() {
-			if (!this.query.trim()) {
-				this.results = [];
-				return;
-			}
+		async search(showAll = false) {
 			this.loading = true;
 			this.errormsg = null;
 			try {
-				const res = await api.searchUsers(this.query.trim());
+				const res = await api.searchUsers(showAll ? "" : this.query.trim());
 				this.results = res.users || [];
+				this.hasSearched = true;
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
 			}
@@ -54,11 +52,12 @@ export default {
 
     <div class="input-group mb-3">
       <input v-model="query" class="form-control" placeholder="Nome Utente" @keyup.enter="search">
-      <button class="btn btn-primary" @click="search">Cerca</button>
+      <button class="btn btn-primary" @click="search()">Cerca</button>
+      <button class="btn btn-outline-secondary" @click="search(true)">Mostra tutti</button>
     </div>
 
     <LoadingSpinner :loading="loading">
-      <div v-if="results.length === 0" class="text-muted">Nessun risultato.</div>
+      <div v-if="results.length === 0 && hasSearched" class="text-muted">Nessun risultato.</div>
       <div class="list-group">
         <div v-for="user in results" :key="user.id" class="list-group-item d-flex justify-content-between align-items-center">
           <div>

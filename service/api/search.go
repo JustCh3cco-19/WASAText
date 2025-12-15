@@ -10,11 +10,11 @@ import (
 
 func (rt *_router) handleSearchUsers(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
 	query := strings.TrimSpace(r.URL.Query().Get("username"))
-	if query == "" {
-		writeError(w, http.StatusBadRequest, "username query parameter is required")
-		return
+	exclude := ""
+	if ctx.AuthenticatedUser != nil {
+		exclude = ctx.AuthenticatedUser.ID
 	}
-	users, err := rt.db.SearchUsers(r.Context(), query)
+	users, err := rt.db.SearchUsers(r.Context(), query, exclude)
 	if err != nil {
 		rt.respondDBError(w, ctx, err, "")
 		return

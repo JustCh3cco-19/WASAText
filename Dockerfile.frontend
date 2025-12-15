@@ -1,23 +1,19 @@
-# Fase di build
 FROM node:lts AS builder
-
-WORKDIR /src/
-
-# Copio il progetto frontend
-COPY ./webui ./webui
 
 WORKDIR /src/webui
 
-# Yarn 4 con PnP
-RUN corepack enable && yarn install --immutable
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
 
-# Build in produzione
-RUN yarn build-prod
+COPY webui/package.json webui/yarn.lock ./
 
-# Fase runtime con Nginx
+RUN yarn install --frozen-lockfile
+
+COPY webui/ ./
+
+RUN yarn build --mode production
+
 FROM nginx:alpine
 
-# Copio l'output generato
 COPY --from=builder /src/webui/dist /usr/share/nginx/html
 
 EXPOSE 80

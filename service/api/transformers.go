@@ -28,12 +28,17 @@ type messageResponse struct {
 	ReplyAttachment string             `json:"replyAttachment,omitempty"`
 	Status          string             `json:"status,omitempty"`
 	Reactions       []reactionResponse `json:"reactions"`
+	DeliveredTo     []string           `json:"deliveredTo,omitempty"`
+	ReadBy          []string           `json:"readBy,omitempty"`
+	RecipientCount  int                `json:"recipientCount,omitempty"`
+	DeliveryStatus  string             `json:"deliveryStatus,omitempty"`
 }
 
 type reactionResponse struct {
-	Emoji   string   `json:"emoji"`
-	UserIDs []string `json:"userIds"`
-	Count   int      `json:"count"`
+	Emoji     string   `json:"emoji"`
+	UserIDs   []string `json:"userIds"`
+	Count     int      `json:"count"`
+	UserNames []string `json:"userNames"`
 }
 
 type conversationSummaryResponse struct {
@@ -100,6 +105,10 @@ func toMessageResponse(msg database.Message) messageResponse {
 		ReplyAttachment: msg.ReplyAttachment,
 		Status:          msg.Status,
 		Reactions:       toReactionResponses(msg.Reactions),
+		DeliveredTo:     safeStringSlice(msg.DeliveredTo),
+		ReadBy:          safeStringSlice(msg.ReadBy),
+		RecipientCount:  msg.RecipientCount,
+		DeliveryStatus:  resolveDeliveryStatus(msg),
 	}
 }
 
@@ -107,20 +116,29 @@ func toReactionResponses(rx []database.Reaction) []reactionResponse {
 	if len(rx) == 0 {
 		return []reactionResponse{}
 	}
-	grouped := make(map[string][]string)
+	grouped := make(map[string][]database.Reaction)
 	for _, r := range rx {
 		key := strings.TrimSpace(r.Emoji)
 		if key == "" {
 			key = "👍"
 		}
-		grouped[key] = append(grouped[key], r.UserID)
+		grouped[key] = append(grouped[key], r)
 	}
 	res := make([]reactionResponse, 0, len(grouped))
-	for emoji, users := range grouped {
+	for emoji, reactions := range grouped {
+		var users []string
+		var names []string
+		for _, r := range reactions {
+			users = append(users, r.UserID)
+			if strings.TrimSpace(r.UserName) != "" {
+				names = append(names, r.UserName)
+			}
+		}
 		res = append(res, reactionResponse{
-			Emoji:   emoji,
-			UserIDs: safeStringSlice(users),
-			Count:   len(users),
+			Emoji:     emoji,
+			UserIDs:   safeStringSlice(users),
+			UserNames: safeStringSlice(names),
+			Count:     len(reactions),
 		})
 	}
 	return res
@@ -161,6 +179,19 @@ func toConversationDetailsResponse(details database.ConversationDetails) convers
 		resp.LastMessage = &last
 	}
 	return resp
+}
+
+func resolveDeliveryStatus(msg database.Message) string {
+	if msg.RecipientCount <= 0 {
+		return ""
+	}
+	if len(msg.ReadBy) >= msg.RecipientCount && msg.RecipientCount > 0 {
+		return "read"
+	}
+	if len(msg.DeliveredTo) >= msg.RecipientCount {
+		return "delivered"
+	}
+	return "sent"
 }
 
 func toGroupResponse(gr database.Group) groupResponse {

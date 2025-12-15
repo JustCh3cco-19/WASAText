@@ -59,10 +59,6 @@ func (rt *_router) handleCreateGroup(w http.ResponseWriter, r *http.Request, _ h
 		members = append(members, ctx.AuthenticatedUser.ID)
 	}
 	image := strings.TrimSpace(r.FormValue("image"))
-	if image == "" {
-		writeError(w, http.StatusBadRequest, "image payload is required")
-		return
-	}
 
 	group, err := rt.db.CreateGroupConversation(r.Context(), name, image, members)
 	if err != nil {

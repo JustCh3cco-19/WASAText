@@ -17,7 +17,7 @@ type AppDatabase interface {
 	GetUserByID(ctx context.Context, id string) (User, error)
 	UpdateUserPhoto(ctx context.Context, id, photo string) (User, error)
 	UpdateUserName(ctx context.Context, id, name string) (User, error)
-	SearchUsers(ctx context.Context, username string) ([]User, error)
+	SearchUsers(ctx context.Context, username, excludeID string) ([]User, error)
 
 	ListConversations(ctx context.Context, userID string) ([]ConversationSummary, error)
 	EnsureDirectConversation(ctx context.Context, requesterID, recipientID string) (ConversationDetails, error)
@@ -102,9 +102,20 @@ func New(db *sql.DB) (AppDatabase, error) {
 			FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		);`,
+		`CREATE TABLE IF NOT EXISTS message_status (
+			message_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			delivered_at TEXT,
+			read_at TEXT,
+			PRIMARY KEY (message_id, user_id),
+			FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		);`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_members_user ON conversation_members(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_members_conversation ON conversation_members(conversation_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_status_user ON message_status(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_status_message ON message_status(message_id);`,
 	}
 
 	for _, stmt := range schema {

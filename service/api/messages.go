@@ -23,6 +23,7 @@ func (rt *_router) handleSendMessage(w http.ResponseWriter, r *http.Request, ps 
 	}
 	content := strings.TrimSpace(r.FormValue("content"))
 	attachment := strings.TrimSpace(r.FormValue("attachment"))
+	replyTo := strings.TrimSpace(r.FormValue("replyTo"))
 	if content == "" && attachment == "" {
 		writeError(w, http.StatusBadRequest, "Content or attachment is required")
 		return
@@ -38,6 +39,7 @@ func (rt *_router) handleSendMessage(w http.ResponseWriter, r *http.Request, ps 
 		SenderName:     ctx.AuthenticatedUser.Name,
 		Content:        content,
 		Attachment:     attachment,
+		ReplyTo:        replyTo,
 		Timestamp:      globaltime.Now(),
 	})
 	if err != nil {

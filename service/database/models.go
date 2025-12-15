@@ -48,6 +48,9 @@ type Message struct {
 	ReactionCount   int
 	ReactingUserIDs []string
 	Reactions       []Reaction
+	DeliveredTo     []string
+	ReadBy          []string
+	RecipientCount  int
 }
 
 // NewMessage contains the information required to persist a new message.
@@ -67,8 +70,9 @@ type NewMessage struct {
 
 // Reaction represents an emoji reaction on a message.
 type Reaction struct {
-	Emoji  string
-	UserID string
+	Emoji    string
+	UserID   string
+	UserName string
 }
 
 // Group is a shortcut for a conversation with is_group == true.

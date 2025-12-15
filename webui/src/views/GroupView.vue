@@ -1,6 +1,7 @@
 <script>
 import api from "../services/api.js";
 import {fileToBase64, base64ImageToDataUrl} from "../services/files.js";
+import {setPageTitle} from "../services/pageTitle.js";
 import sessionStore from "../services/sessionStore.js";
 
 const DEFAULT_REACTIONS = ["👍", "❤️", "😂", "😮", "🎉"];
@@ -38,6 +39,7 @@ export default {
 				message: null,
 				error: null,
 			},
+			replyingTo: null,
 		};
 	},
 	computed: {
@@ -56,8 +58,6 @@ export default {
 			const name = this.group?.name || "G";
 			return name.charAt(0).toUpperCase() || "G";
 		},
-	},
-	computed: {
 		groupedMessages() {
 			const groups = [];
 			const messages = this.conversation?.messages || [];
@@ -82,6 +82,8 @@ export default {
 			handler() {
 				this.resetComposer();
 				this.photoFileName = "";
+				this.replyingTo = null;
+				setPageTitle("Gruppo");
 				this.refresh();
 				this.startAutoRefresh();
 			},
@@ -118,8 +120,11 @@ export default {
 				this.group = groupRes;
 				this.newName = this.group?.name || "";
 				this.conversation = convRes;
+				this.updatePageTitle();
 				await this.$nextTick();
-				this.scrollToBottom();
+				if (!silent) {
+					this.scrollToTop();
+				}
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
 			}
@@ -222,8 +227,10 @@ export default {
 				await api.sendMessage(this.id, {
 					content: this.messageText.trim(),
 					attachment: this.attachmentData,
+					replyTo: this.replyingTo?.id,
 				});
 				this.resetComposer();
+				this.replyingTo = null;
 				await this.refresh();
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
@@ -239,6 +246,12 @@ export default {
 				e.preventDefault();
 				this.sendMessage();
 			}
+		},
+		startReply(message) {
+			this.replyingTo = message;
+		},
+		cancelReply() {
+			this.replyingTo = null;
 		},
 		async openForwardModal(message) {
 			this.forwardState.open = true;
@@ -355,11 +368,39 @@ export default {
 			}
 			return date.toLocaleDateString(undefined, {weekday: "long", day: "numeric", month: "short"});
 		},
-		scrollToBottom() {
+		scrollToTop() {
 			const el = this.$refs.messageThread;
 			if (el && el.scrollHeight != null) {
-				el.scrollTop = el.scrollHeight;
+				el.scrollTop = 0;
 			}
+		},
+		replyPreview(message) {
+			if (!message) return "";
+			if (message.content) return message.content;
+			if (message.attachment) return "[Allegato]";
+			return "Messaggio";
+		},
+		deliveryBadge(message) {
+			if (!this.isOwnMessage(message)) return null;
+			const recipients = message.recipientCount || 0;
+			if (recipients === 0) return null;
+			const delivered = (message.deliveredTo || []).length;
+			const read = (message.readBy || []).length;
+			if (read >= recipients) {
+				return {icon: "✓✓", label: `Letto da tutti (${read}/${recipients})`};
+			}
+			if (delivered > 0) {
+				return {icon: "✓", label: `Consegnato (${delivered}/${recipients})`};
+			}
+			return {icon: "✓", label: "Inviato"};
+		},
+		reactionLabel(rx) {
+			const names = rx?.userNames?.length ? rx.userNames.join(", ") : (rx?.userIds || []).join(", ");
+			return names ? `${rx.emoji} ${rx.count} · ${names}` : `${rx.emoji} ${rx.count}`;
+		},
+		updatePageTitle() {
+			const title = this.group?.name || "Gruppo";
+			setPageTitle(title);
 		},
 	},
 };
@@ -408,6 +449,7 @@ export default {
                         ...
                       </button>
                       <div v-if="openActionsFor === message.id" class="actions-menu card shadow-sm">
+                        <button type="button" class="dropdown-item" @click.stop="startReply(message)">Rispondi</button>
                         <button type="button" class="dropdown-item" @click.stop="openForwardModal(message)">Inoltra</button>
                         <button
                           v-if="isOwnMessage(message)"
@@ -423,6 +465,12 @@ export default {
                   <div v-if="isForwarded(message)" class="forwarded-label">
                     <span class="arrow">↪</span>
                     <em>Messaggio inoltrato</em>
+                  </div>
+                  <div v-if="message.replyTo" class="reply-chip">
+                    <div class="small text-muted">Risposta a {{ message.replySenderName || "messaggio" }}</div>
+                    <div class="reply-text">
+                      {{ message.replyContent || (message.replyAttachment ? "[Allegato]" : "Messaggio") }}
+                    </div>
                   </div>
                   <div class="mb-1">
                     <p v-if="message.content" class="mb-1">{{ message.content }}</p>
@@ -441,14 +489,23 @@ export default {
                         v-for="rx in message.reactions"
                         :key="rx.emoji"
                         class="badge bg-light text-dark border"
+                        :title="reactionLabel(rx)"
                       >
                         {{ rx.emoji }} {{ rx.count }}
+                        <span v-if="rx.userNames?.length" class="ms-1 text-muted">({{ rx.userNames.join(', ') }})</span>
                       </span>
                     </div>
                     <span v-else>Nessuna reazione</span>
                   </div>
-                  <div class="message-meta text-end text-muted small">
-                    {{ formatTimestamp(message.timestamp) }}
+                  <div class="message-meta text-muted small">
+                    <span class="timestamp">{{ formatTimestamp(message.timestamp) }}</span>
+                    <span
+                      v-if="deliveryBadge(message)"
+                      class="delivery-icon"
+                      :title="deliveryBadge(message).label"
+                    >
+                      {{ deliveryBadge(message).icon }}
+                    </span>
                   </div>
                   <div class="reaction-picker">
                     <button
@@ -469,6 +526,13 @@ export default {
 
           <div class="chat-composer card shadow-sm">
             <div class="card-body">
+              <div v-if="replyingTo" class="alert alert-secondary py-2 px-3 d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="small text-muted">Rispondi a {{ replyingTo.senderName || "messaggio" }}</div>
+                  <div class="fw-semibold">{{ replyPreview(replyingTo) }}</div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @click="cancelReply">Annulla</button>
+              </div>
               <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-light d-flex align-items-center" type="button" title="Allega" @click="$refs.attachmentInput.click()">
                   <svg class="feather"><use href="/feather-sprite-v4.29.0.svg#paperclip" /></svg>
@@ -622,6 +686,21 @@ export default {
 
 .message-meta {
   margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: #6c757d;
+}
+
+.message-meta .timestamp {
+  line-height: 1;
+}
+
+.message-meta .delivery-icon {
+  font-size: 0.9em;
+  line-height: 1;
+  margin-left: 2px;
 }
 
 .forwarded-label {
@@ -636,6 +715,14 @@ export default {
 .forwarded-label .arrow {
   font-size: 14px;
   line-height: 1;
+}
+
+.reply-chip {
+  background: rgba(0, 0, 0, 0.04);
+  border-left: 3px solid #6c757d;
+  padding: 4px 8px;
+  border-radius: 8px;
+  margin-bottom: 6px;
 }
 
 .reaction-picker {

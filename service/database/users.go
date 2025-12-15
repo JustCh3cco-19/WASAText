@@ -131,16 +131,47 @@ func (db *appdbimpl) UpdateUserName(ctx context.Context, id, name string) (User,
 	return db.GetUserByID(ctx, id)
 }
 
-func (db *appdbimpl) SearchUsers(ctx context.Context, username string) ([]User, error) {
+func (db *appdbimpl) SearchUsers(ctx context.Context, username, excludeID string) ([]User, error) {
 	username = strings.TrimSpace(username)
+	excludeID = strings.TrimSpace(excludeID)
 	if username == "" {
-		return []User{}, nil
+		args := []interface{}{}
+		query := `SELECT id, name, photo FROM users`
+		if excludeID != "" {
+			query += ` WHERE id != ?`
+			args = append(args, excludeID)
+		}
+		query += ` ORDER BY name LIMIT 200`
+		rows, err := db.c.QueryContext(ctx,
+			query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("search users: %w", err)
+		}
+		defer func() { _ = rows.Close() }()
+
+		var users []User
+		for rows.Next() {
+			var u User
+			if err := rows.Scan(&u.ID, &u.Name, &u.Photo); err != nil {
+				return nil, fmt.Errorf("scan user row: %w", err)
+			}
+			users = append(users, u)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate users: %w", err)
+		}
+		return users, nil
 	}
 	q := fmt.Sprintf("%%%s%%", username)
+	args := []interface{}{q}
+	query := `SELECT id, name, photo FROM users WHERE name LIKE ?`
+	if excludeID != "" {
+		query += ` AND id != ?`
+		args = append(args, excludeID)
+	}
+	query += ` ORDER BY name LIMIT 100`
 
-	rows, err := db.c.QueryContext(ctx,
-		`SELECT id, name, photo FROM users WHERE name LIKE ? ORDER BY name LIMIT 100`,
-		q)
+	rows, err := db.c.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("search users: %w", err)
 	}

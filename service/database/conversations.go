@@ -17,6 +17,10 @@ type conversationRow struct {
 }
 
 func (db *appdbimpl) ListConversations(ctx context.Context, userID string) ([]ConversationSummary, error) {
+	if err := db.markMessagesDeliveredForUser(ctx, userID); err != nil {
+		return nil, err
+	}
+
 	rows, err := db.c.QueryContext(ctx, `
 		SELECT c.id, c.name, c.photo, c.is_group
 		FROM conversations c
@@ -45,6 +49,12 @@ func (db *appdbimpl) ListConversations(ctx context.Context, userID string) ([]Co
 	}
 	if len(convRows) == 0 {
 		return []ConversationSummary{}, nil
+	}
+
+	for _, c := range convRows {
+		if err := db.ensureConversationStatuses(ctx, c.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	ids := make([]string, len(convRows))
@@ -149,6 +159,16 @@ func (db *appdbimpl) GetConversationDetails(ctx context.Context, userID, convers
 	}
 	if !isMember {
 		return ConversationDetails{}, ErrForbidden
+	}
+
+	if err := db.ensureConversationStatuses(ctx, conversationID); err != nil {
+		return ConversationDetails{}, err
+	}
+	if err := db.markMessagesDeliveredForConversation(ctx, conversationID, userID); err != nil {
+		return ConversationDetails{}, err
+	}
+	if err := db.markMessagesReadForConversation(ctx, conversationID, userID); err != nil {
+		return ConversationDetails{}, err
 	}
 
 	memberMap, err := db.loadConversationUsers(ctx, []string{conversationID})
@@ -280,6 +300,10 @@ func (db *appdbimpl) loadLastMessages(ctx context.Context, conversationIDs []str
 	}
 
 	if len(messageIDs) > 0 {
+		receipts, err := db.loadMessageReceipts(ctx, messageIDs)
+		if err != nil {
+			return nil, err
+		}
 		reactions, err := db.loadReactions(ctx, messageIDs)
 		if err != nil {
 			return nil, err
@@ -289,6 +313,17 @@ func (db *appdbimpl) loadLastMessages(ctx context.Context, conversationIDs []str
 				msg.Reactions = rx
 				msg.ReactingUserIDs = uniqueReactionUsers(rx)
 				msg.ReactionCount = len(msg.ReactingUserIDs)
+			}
+			if rcpts, ok := receipts[msg.ID]; ok {
+				for _, r := range rcpts {
+					if r.Delivered {
+						msg.DeliveredTo = append(msg.DeliveredTo, r.UserID)
+					}
+					if r.Read {
+						msg.ReadBy = append(msg.ReadBy, r.UserID)
+					}
+				}
+				msg.RecipientCount = len(rcpts)
 			}
 		}
 	}
@@ -314,7 +349,7 @@ func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversati
 		       reply_to, reply_content, reply_sender_name, reply_attachment, status
 		FROM messages
 		WHERE conversation_id = ?
-		ORDER BY created_at ASC`, conversationID)
+		ORDER BY created_at DESC`, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("load messages: %w", err)
 	}
@@ -342,11 +377,26 @@ func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversati
 	if err != nil {
 		return nil, err
 	}
+	receipts, err := db.loadMessageReceipts(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
 	for i := range messages {
 		if rx, ok := reactions[messages[i].ID]; ok {
 			messages[i].Reactions = rx
 			messages[i].ReactingUserIDs = uniqueReactionUsers(rx)
 			messages[i].ReactionCount = len(messages[i].ReactingUserIDs)
+		}
+		if rcpts, ok := receipts[messages[i].ID]; ok {
+			for _, r := range rcpts {
+				if r.Delivered {
+					messages[i].DeliveredTo = append(messages[i].DeliveredTo, r.UserID)
+				}
+				if r.Read {
+					messages[i].ReadBy = append(messages[i].ReadBy, r.UserID)
+				}
+			}
+			messages[i].RecipientCount = len(rcpts)
 		}
 	}
 
@@ -408,7 +458,11 @@ func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (ma
 	if len(messageIDs) == 0 {
 		return result, nil
 	}
-	query := fmt.Sprintf(`SELECT message_id, user_id, content FROM message_comments WHERE message_id IN (%s) ORDER BY created_at ASC`, buildPlaceholders(len(messageIDs)))
+	query := fmt.Sprintf(`SELECT mc.message_id, mc.user_id, u.name, mc.content
+		FROM message_comments mc
+		JOIN users u ON u.id = mc.user_id
+		WHERE mc.message_id IN (%s)
+		ORDER BY mc.created_at ASC`, buildPlaceholders(len(messageIDs)))
 	rows, err := db.c.QueryContext(ctx, query, toInterfaceSlice(messageIDs)...)
 	if err != nil {
 		return nil, fmt.Errorf("load reactions: %w", err)
@@ -416,13 +470,14 @@ func (db *appdbimpl) loadReactions(ctx context.Context, messageIDs []string) (ma
 	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
-		var messageID, userID, emoji string
-		if err := rows.Scan(&messageID, &userID, &emoji); err != nil {
+		var messageID, userID, userName, emoji string
+		if err := rows.Scan(&messageID, &userID, &userName, &emoji); err != nil {
 			return nil, fmt.Errorf("scan reaction: %w", err)
 		}
 		result[messageID] = append(result[messageID], Reaction{
-			Emoji:  emoji,
-			UserID: userID,
+			Emoji:    emoji,
+			UserID:   userID,
+			UserName: userName,
 		})
 	}
 	if err := rows.Err(); err != nil {

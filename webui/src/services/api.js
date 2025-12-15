@@ -23,13 +23,16 @@ export default {
 		return data;
 	},
 
-	async sendMessage(conversationId, {content, attachment}) {
+	async sendMessage(conversationId, {content, attachment, replyTo}) {
 		const formData = new FormData();
 		if (content) {
 			formData.append("content", content);
 		}
 		if (attachment) {
 			formData.append("attachment", attachment);
+		}
+		if (replyTo) {
+			formData.append("replyTo", replyTo);
 		}
 		const {data} = await axios.post(
 			`/conversations/${conversationId}/message`,

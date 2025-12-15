@@ -17,13 +17,43 @@ func (db *appdbimpl) CreateMessage(ctx context.Context, payload NewMessage) (Mes
 		return Message{}, ErrForbidden
 	}
 
+	members, err := db.getConversationMemberIDs(ctx, payload.ConversationID)
+	if err != nil {
+		return Message{}, err
+	}
+
+	if strings.TrimSpace(payload.ReplyTo) != "" {
+		original, err := db.getMessageByID(ctx, payload.ReplyTo)
+		if err != nil {
+			return Message{}, err
+		}
+		if original.ConversationID != payload.ConversationID {
+			return Message{}, ErrForbidden
+		}
+		if strings.TrimSpace(payload.ReplyContent) == "" {
+			payload.ReplyContent = original.Content
+		}
+		if strings.TrimSpace(payload.ReplySenderName) == "" {
+			payload.ReplySenderName = original.SenderName
+		}
+		if strings.TrimSpace(payload.ReplyAttachment) == "" {
+			payload.ReplyAttachment = original.Attachment
+		}
+	}
+
 	messageID := generateIdentifier()
 	if messageID == "" {
 		return Message{}, fmt.Errorf("generate message id")
 	}
 	createdAt := payload.Timestamp.UTC().Format(time.RFC3339Nano)
 
-	_, err = db.c.ExecContext(ctx, `
+	tx, err := db.c.BeginTx(ctx, nil)
+	if err != nil {
+		return Message{}, fmt.Errorf("begin create message: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO messages (
 			id, conversation_id, sender_id, sender_name, content, attachment, created_at,
 			reply_to, reply_content, reply_sender_name, reply_attachment, status
@@ -43,6 +73,20 @@ func (db *appdbimpl) CreateMessage(ctx context.Context, payload NewMessage) (Mes
 	)
 	if err != nil {
 		return Message{}, fmt.Errorf("insert message: %w", err)
+	}
+
+	for _, member := range members {
+		if member == payload.SenderID {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO message_status (message_id, user_id, delivered_at, read_at) VALUES (?, ?, NULL, NULL)`,
+			messageID, member); err != nil {
+			return Message{}, fmt.Errorf("insert message status: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Message{}, fmt.Errorf("commit message creation: %w", err)
 	}
 
 	return db.getMessageByID(ctx, messageID)
@@ -173,6 +217,20 @@ func (db *appdbimpl) getMessageByID(ctx context.Context, messageID string) (Mess
 		msg.Reactions = reactions[msg.ID]
 		msg.ReactingUserIDs = uniqueReactionUsers(msg.Reactions)
 		msg.ReactionCount = len(msg.ReactingUserIDs)
+	}
+	receipts, err := db.loadMessageReceipts(ctx, []string{msg.ID})
+	if err == nil {
+		if rcpts, ok := receipts[msg.ID]; ok {
+			for _, r := range rcpts {
+				if r.Delivered {
+					msg.DeliveredTo = append(msg.DeliveredTo, r.UserID)
+				}
+				if r.Read {
+					msg.ReadBy = append(msg.ReadBy, r.UserID)
+				}
+			}
+			msg.RecipientCount = len(rcpts)
+		}
 	}
 	return msg, nil
 }
