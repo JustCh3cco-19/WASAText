@@ -3,25 +3,35 @@ import sessionStore from "./sessionStore.js";
 
 const resolveApiBaseUrl = () => {
 	const configured = (__API_URL__ || "").trim();
-	const isLocalhost =
-		configured.startsWith("http://localhost") ||
-		configured.startsWith("https://localhost") ||
-		configured.startsWith("http://127.0.0.1") ||
-		configured.startsWith("https://127.0.0.1");
+	const parsed = configured ? (() => {
+		try {
+			return new URL(configured);
+		} catch (_) {
+			return null;
+		}
+	})() : null;
+	const isLocalhost = (
+		parsed?.hostname === "localhost" ||
+		parsed?.hostname === "127.0.0.1" ||
+		configured.includes("localhost") ||
+		configured.includes("127.0.0.1")
+	);
 
-	// Respect explicit non-local configuration.
-	if (configured && !isLocalhost) {
+	// Respect explicit non-local configuration (including relative URLs).
+	if (configured && (!isLocalhost)) {
 		return configured;
 	}
 
-	// If we're in the browser, use the current host with the backend port.
+	// If we're in the browser, derive the host from the current location and keep the configured port if available.
 	if (typeof window !== "undefined") {
 		const {protocol, hostname} = window.location;
-		return `${protocol}//${hostname}:3000`;
+		const port = parsed?.port || "3000";
+		const portPart = port ? `:${port}` : "";
+		return `${protocol}//${hostname}${portPart}`;
 	}
 
 	// Fallback for non-browser contexts.
-	return configured || "http://localhost:3000";
+	return configured || "";
 };
 
 const instance = axios.create({
