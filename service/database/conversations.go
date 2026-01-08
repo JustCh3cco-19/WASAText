@@ -85,13 +85,13 @@ func (db *appdbimpl) ListConversations(ctx context.Context, userID string) ([]Co
 	return summaries, nil
 }
 
-func (db *appdbimpl) EnsureDirectConversation(ctx context.Context, requesterID, recipientID string) (ConversationDetails, error) {
+func (db *appdbimpl) ensureDirectConversationID(ctx context.Context, requesterID, recipientID string) (string, error) {
 	if requesterID == recipientID {
-		return ConversationDetails{}, ErrBadRequest
+		return "", ErrBadRequest
 	}
 
 	if _, err := db.GetUserByID(ctx, recipientID); err != nil {
-		return ConversationDetails{}, err
+		return "", err
 	}
 
 	var conversationID string
@@ -105,39 +105,51 @@ func (db *appdbimpl) EnsureDirectConversation(ctx context.Context, requesterID, 
 		LIMIT 1`, requesterID, recipientID).Scan(&conversationID)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return ConversationDetails{}, fmt.Errorf("query direct conversation: %w", err)
+		return "", fmt.Errorf("query direct conversation: %w", err)
 	}
 	if err == nil {
-		return db.GetConversationDetails(ctx, requesterID, conversationID)
+		return conversationID, nil
 	}
 
 	conversationID = generateIdentifier()
 	if conversationID == "" {
-		return ConversationDetails{}, fmt.Errorf("generate conversation id")
+		return "", fmt.Errorf("generate conversation id")
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	tx, err := db.c.BeginTx(ctx, nil)
 	if err != nil {
-		return ConversationDetails{}, fmt.Errorf("begin tx: %w", err)
+		return "", fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, `INSERT INTO conversations (id, name, photo, is_group, created_at) VALUES (?, '', '', 0, ?)`, conversationID, now); err != nil {
-		return ConversationDetails{}, fmt.Errorf("insert conversation: %w", err)
+		return "", fmt.Errorf("insert conversation: %w", err)
 	}
 
 	members := []string{requesterID, recipientID}
 	for _, member := range members {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO conversation_members (conversation_id, user_id, added_at) VALUES (?, ?, ?)`, conversationID, member, now); err != nil {
-			return ConversationDetails{}, fmt.Errorf("insert conversation member: %w", err)
+			return "", fmt.Errorf("insert conversation member: %w", err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return ConversationDetails{}, fmt.Errorf("commit tx: %w", err)
+		return "", fmt.Errorf("commit tx: %w", err)
 	}
 
+	return conversationID, nil
+}
+
+func (db *appdbimpl) EnsureDirectConversationID(ctx context.Context, requesterID, recipientID string) (string, error) {
+	return db.ensureDirectConversationID(ctx, requesterID, recipientID)
+}
+
+func (db *appdbimpl) EnsureDirectConversation(ctx context.Context, requesterID, recipientID string) (ConversationDetails, error) {
+	conversationID, err := db.ensureDirectConversationID(ctx, requesterID, recipientID)
+	if err != nil {
+		return ConversationDetails{}, err
+	}
 	return db.GetConversationDetails(ctx, requesterID, conversationID)
 }
 

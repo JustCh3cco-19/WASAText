@@ -58,6 +58,7 @@ func (rt *_router) handleForwardMessage(w http.ResponseWriter, r *http.Request, 
 	}
 	var payload struct {
 		TargetConversationID string `json:"targetConversationId"`
+		TargetUserID         string `json:"targetUserId"`
 		ForwarderName        string `json:"forwarderName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -65,16 +66,27 @@ func (rt *_router) handleForwardMessage(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	payload.TargetConversationID = strings.TrimSpace(payload.TargetConversationID)
-	if payload.TargetConversationID == "" {
-		writeError(w, http.StatusBadRequest, "Target conversation is required")
+	payload.TargetUserID = strings.TrimSpace(payload.TargetUserID)
+	if payload.TargetConversationID == "" && payload.TargetUserID == "" {
+		writeError(w, http.StatusBadRequest, "Target conversation or user is required")
 		return
+	}
+
+	targetConversationID := payload.TargetConversationID
+	if targetConversationID == "" {
+		convID, err := rt.db.EnsureDirectConversationID(r.Context(), ctx.AuthenticatedUser.ID, payload.TargetUserID)
+		if err != nil {
+			rt.respondDBError(w, ctx, err, "")
+			return
+		}
+		targetConversationID = convID
 	}
 
 	message, err := rt.db.ForwardMessage(
 		r.Context(),
 		conversationID,
 		messageID,
-		payload.TargetConversationID,
+		targetConversationID,
 		ctx.AuthenticatedUser.ID,
 		payload.ForwarderName,
 	)

@@ -8,7 +8,6 @@ const STATUS_KEY = "userStatus";
 export default {
 	data() {
 		return {
-			errormsg: null,
 			loading: false,
 			newName: sessionStore.state.user?.name || "",
 			newPhotoCropped: "",
@@ -23,6 +22,8 @@ export default {
 			status: localStorage.getItem(STATUS_KEY) || "Disponibile",
 			photoFileName: "",
 			accountSettingsOpen: false,
+			accountError: null,
+			cropError: null,
 		};
 	},
 	computed: {
@@ -49,18 +50,19 @@ export default {
 		async updateName() {
 			if (!this.newName.trim()) return;
 			this.updatingName = true;
-			this.errormsg = null;
+			this.accountError = null;
 			try {
 				const user = await api.setMyName(this.newName.trim());
 				sessionStore.setUser(user);
 			} catch (e) {
-				this.errormsg = e?.response?.data?.error || e.toString();
+				this.accountError = e?.response?.data?.error || e.toString();
 			}
 			this.updatingName = false;
 		},
 		async onPhotoChange(event) {
 			const inputEl = event?.target;
 			const file = inputEl?.files?.[0];
+			this.accountError = null;
 			this.photoFileName = file?.name || "";
 			if (!file) {
 				this.resetPhotoCrop();
@@ -74,14 +76,14 @@ export default {
 				this.updateCropPreview();
 			};
 			reader.onerror = () => {
-				this.errormsg = "Errore nel leggere il file";
+				this.accountError = "Errore nel leggere il file";
 			};
 			reader.readAsDataURL(file);
 		},
 		async updatePhoto() {
 			if (!this.newPhotoCropped) return;
 			this.updatingPhoto = true;
-			this.errormsg = null;
+			this.cropError = null;
 			try {
 				const user = await api.setMyPhoto(this.newPhotoCropped);
 				sessionStore.setUser(user);
@@ -89,7 +91,7 @@ export default {
 				const input = this.$refs.photoInput;
 				if (input) input.value = null;
 			} catch (e) {
-				this.errormsg = e?.response?.data?.error || e.toString();
+				this.cropError = e?.response?.data?.error || e.toString();
 			}
 			this.updatingPhoto = false;
 		},
@@ -105,7 +107,7 @@ export default {
 				this.newPhotoCropped = base64;
 				this.photoPreview = `data:image/png;base64,${base64}`;
 			} catch (e) {
-				this.errormsg = e?.toString() || "Errore nel ritaglio";
+				this.cropError = e?.toString() || "Errore nel ritaglio";
 			}
 		},
 		resetPhotoCrop() {
@@ -113,6 +115,7 @@ export default {
 			this.photoPreview = "";
 			this.cropSourceUrl = "";
 			this.cropModalOpen = false;
+			this.cropError = null;
 			this.cropX = 0;
 			this.cropY = 0;
 			this.cropScale = 1;
@@ -121,9 +124,11 @@ export default {
 			if (input) input.value = null;
 		},
 		openAccountSettings() {
+			this.accountError = null;
 			this.accountSettingsOpen = true;
 		},
 		closeAccountSettings() {
+			this.accountError = null;
 			this.accountSettingsOpen = false;
 		},
 		updateStatus() {
@@ -139,8 +144,6 @@ export default {
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
       <h1 class="h3 mb-0">Profilo</h1>
     </div>
-
-    <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
     <div class="card mb-3 profile-card text-center">
       <div class="card-body">
@@ -165,6 +168,7 @@ export default {
             <h5 class="card-title mb-0">Impostazioni Account</h5>
             <button class="btn btn-sm btn-outline-secondary" @click="closeAccountSettings">Chiudi</button>
           </div>
+          <ErrorMsg v-if="accountError" :msg="accountError" />
           <div class="mb-3">
             <label class="form-label">Nome</label>
             <div class="input-group">
@@ -205,6 +209,7 @@ export default {
               </button>
             </div>
           </div>
+          <ErrorMsg v-if="cropError" :msg="cropError" />
           <div class="row g-3">
             <div class="col-md-6 text-center">
               <div class="crop-preview rounded-circle mx-auto" style="width: 180px; height: 180px; overflow: hidden;">

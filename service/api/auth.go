@@ -56,15 +56,15 @@ func (rt *_router) authenticate(r *http.Request) (database.User, error) {
 func (rt *_router) handleAuthError(w http.ResponseWriter, ctx reqcontext.RequestContext, err error) {
 	switch {
 	case errors.Is(err, errMissingToken):
-		writeError(w, http.StatusUnauthorized, "Missing authentication token")
+		writeError(w, http.StatusUnauthorized, "Token di autenticazione mancante")
 	case errors.Is(err, errInvalidToken):
-		writeError(w, http.StatusUnauthorized, "Invalid authentication token")
+		writeError(w, http.StatusUnauthorized, "Token di autenticazione non valido")
 	case errors.Is(err, database.ErrNotFound):
-		writeError(w, http.StatusUnauthorized, "Invalid or missing authentication token")
+		writeError(w, http.StatusUnauthorized, "Token di autenticazione non valido o mancante")
 	case errors.Is(err, database.ErrUnauthorized):
-		writeError(w, http.StatusUnauthorized, "Invalid or missing authentication token")
+		writeError(w, http.StatusUnauthorized, "Token di autenticazione non valido o mancante")
 	default:
 		ctx.Logger.WithError(err).Error("authentication error")
-		writeError(w, http.StatusInternalServerError, "Internal server error")
+		writeError(w, http.StatusInternalServerError, "Errore interno del server")
 	}
 }

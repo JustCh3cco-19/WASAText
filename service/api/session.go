@@ -14,13 +14,13 @@ func (rt *_router) handleLogin(w http.ResponseWriter, r *http.Request, _ httprou
 		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+		writeError(w, http.StatusBadRequest, "Payload JSON non valido")
 		return
 	}
 
 	payload.Name = strings.TrimSpace(payload.Name)
 	if len(payload.Name) < 3 || len(payload.Name) > 16 || !usernameRegexp.MatchString(payload.Name) {
-		writeError(w, http.StatusBadRequest, "Name must be between 3 and 16 characters and contain only letters, numbers or underscore")
+		writeError(w, http.StatusBadRequest, "Il nome deve essere tra 3 e 16 caratteri e contenere solo lettere, numeri o underscore")
 		return
 	}
 

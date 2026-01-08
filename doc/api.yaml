@@ -277,13 +277,19 @@ components:
 
     ForwardMessageRequest:
       type: object
-      description: Request schema for forwarding a message.
-      required: [targetConversationId]
+      description: Request schema for forwarding a message. Either targetConversationId or targetUserId is required.
       properties:
         targetConversationId:
           type: string
           description: ID of the conversation to which the message will be forwarded.
           example: "conv456"
+          pattern: '^[a-zA-Z0-9_]+$'
+          minLength: 1
+          maxLength: 50
+        targetUserId:
+          type: string
+          description: ID of the user to start or reuse a direct conversation with and forward the message.
+          example: "user789"
           pattern: '^[a-zA-Z0-9_]+$'
           minLength: 1
           maxLength: 50

@@ -42,10 +42,17 @@ export default {
 		return data;
 	},
 
-	async forwardMessage(conversationId, messageId, targetConversationId) {
+	async forwardMessage(conversationId, messageId, targetConversationId, targetUserId) {
+		const payload = {};
+		if (targetConversationId) {
+			payload.targetConversationId = targetConversationId;
+		}
+		if (targetUserId) {
+			payload.targetUserId = targetUserId;
+		}
 		const {data} = await axios.post(
 			`/conversations/${conversationId}/message/${messageId}/forward`,
-			{targetConversationId}
+			payload
 		);
 		return data;
 	},

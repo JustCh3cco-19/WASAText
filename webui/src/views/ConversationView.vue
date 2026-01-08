@@ -27,6 +27,10 @@ export default {
 				open: false,
 				loading: false,
 				conversations: [],
+				searchQuery: "",
+				searching: false,
+				users: [],
+				searched: false,
 				message: null,
 				error: null,
 			},
@@ -176,6 +180,10 @@ export default {
 			this.forwardState.message = message;
 			this.forwardState.loading = true;
 			this.forwardState.error = null;
+			this.forwardState.searchQuery = "";
+			this.forwardState.searching = false;
+			this.forwardState.users = [];
+			this.forwardState.searched = false;
 			try {
 				const res = await api.getConversations();
 				this.forwardState.conversations = res.conversations || [];
@@ -188,6 +196,28 @@ export default {
 			this.forwardState.open = false;
 			this.forwardState.message = null;
 			this.forwardState.error = null;
+			this.forwardState.searchQuery = "";
+			this.forwardState.searching = false;
+			this.forwardState.users = [];
+			this.forwardState.searched = false;
+		},
+		async searchForwardUsers(showAll = false) {
+			const query = showAll ? "" : this.forwardState.searchQuery.trim();
+			if (!showAll && !query) {
+				this.forwardState.users = [];
+				this.forwardState.searched = false;
+				return;
+			}
+			this.forwardState.searching = true;
+			this.forwardState.error = null;
+			try {
+				const res = await api.searchUsers(query);
+				this.forwardState.users = res.users || [];
+				this.forwardState.searched = true;
+			} catch (e) {
+				this.forwardState.error = e?.response?.data?.error || e.toString();
+			}
+			this.forwardState.searching = false;
 		},
 		async forwardToConversation(targetConversationId) {
 			if (!targetConversationId || !this.forwardState.message) return;
@@ -195,6 +225,18 @@ export default {
 			this.forwardState.loading = true;
 			try {
 				await api.forwardMessage(this.id, this.forwardState.message.id, targetConversationId);
+				this.closeForwardModal();
+			} catch (e) {
+				this.forwardState.error = e?.response?.data?.error || e.toString();
+			}
+			this.forwardState.loading = false;
+		},
+		async forwardToUser(targetUserId) {
+			if (!targetUserId || !this.forwardState.message) return;
+			this.errormsg = null;
+			this.forwardState.loading = true;
+			try {
+				await api.forwardMessage(this.id, this.forwardState.message.id, null, targetUserId);
 				this.closeForwardModal();
 			} catch (e) {
 				this.forwardState.error = e?.response?.data?.error || e.toString();
@@ -501,18 +543,48 @@ export default {
             <p class="text-muted small mb-2">Seleziona una chat o un gruppo</p>
             <div v-if="forwardState.error" class="text-danger small mb-2">{{ forwardState.error }}</div>
             <div v-if="forwardState.loading" class="text-muted">Caricamento…</div>
-            <div v-else class="list-group forward-list">
-              <button
-                v-for="conv in forwardState.conversations"
-                :key="conv.id"
-                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                @click="forwardToConversation(conv.id)"
-              >
-                <span>{{ conv.name || conv.id }}</span>
-                <span class="badge bg-light text-dark">{{ conv.isGroup ? "Gruppo" : "Chat" }}</span>
-              </button>
-              <div v-if="forwardState.conversations.length === 0" class="text-muted small">
-                Nessuna chat disponibile.
+            <div v-else>
+              <div class="list-group forward-list">
+                <button
+                  v-for="conv in forwardState.conversations"
+                  :key="conv.id"
+                  class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                  @click="forwardToConversation(conv.id)"
+                >
+                  <span>{{ conv.name || conv.id }}</span>
+                  <span class="badge bg-light text-dark">{{ conv.isGroup ? "Gruppo" : "Chat" }}</span>
+                </button>
+                <div v-if="forwardState.conversations.length === 0" class="text-muted small">
+                  Nessuna chat disponibile.
+                </div>
+              </div>
+              <div class="mt-3">
+                <p class="text-muted small mb-2">Oppure cerca un utente</p>
+                <div class="input-group input-group-sm mb-2">
+                  <input
+                    v-model="forwardState.searchQuery"
+                    class="form-control"
+                    placeholder="Nome utente"
+                    @keyup.enter="searchForwardUsers()"
+                  >
+                  <button class="btn btn-outline-secondary" @click="searchForwardUsers()">Cerca</button>
+                  <button class="btn btn-outline-secondary" @click="searchForwardUsers(true)">Mostra tutti</button>
+                </div>
+                <div v-if="forwardState.searching" class="text-muted">Caricamento...</div>
+                <div v-else class="list-group forward-list">
+                  <button
+                    v-for="user in forwardState.users"
+                    :key="user.id"
+                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                    @click="forwardToUser(user.id)"
+                  >
+                    <span>{{ user.name || user.id }}</span>
+                    <span class="badge bg-light text-dark">Utente</span>
+                  </button>
+                  <div v-if="forwardState.users.length === 0 && forwardState.searched" class="text-muted small">
+                    Nessun utente trovato.
+                  </div>
+                </div>
               </div>
             </div>
           </div>

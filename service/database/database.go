@@ -23,6 +23,7 @@ type AppDatabase interface {
 
 	ListConversations(ctx context.Context, userID string) ([]ConversationSummary, error)
 	EnsureDirectConversation(ctx context.Context, requesterID, recipientID string) (ConversationDetails, error)
+	EnsureDirectConversationID(ctx context.Context, requesterID, recipientID string) (string, error)
 	GetConversationDetails(ctx context.Context, userID, conversationID string) (ConversationDetails, error)
 
 	CreateGroupConversation(ctx context.Context, name, photo string, memberIDs []string) (Group, error)
