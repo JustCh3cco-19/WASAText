@@ -108,8 +108,14 @@ func (db *appdbimpl) UpdateUserName(ctx context.Context, id, name string) (User,
 		return User{}, ErrBadRequest
 	}
 
+	tx, err := db.c.BeginTx(ctx, nil)
+	if err != nil {
+		return User{}, fmt.Errorf("begin update username: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	var existing string
-	err := db.c.QueryRowContext(ctx, `SELECT id FROM users WHERE name = ?`, name).Scan(&existing)
+	err = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE name = ?`, name).Scan(&existing)
 	if err == nil && existing != id {
 		return User{}, ErrConflict
 	}
@@ -117,8 +123,11 @@ func (db *appdbimpl) UpdateUserName(ctx context.Context, id, name string) (User,
 		return User{}, fmt.Errorf("check duplicate name: %w", err)
 	}
 
-	res, err := db.c.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, name, id)
+	res, err := tx.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, name, id)
 	if err != nil {
+		if sqliteIsConstraint(err) {
+			return User{}, ErrConflict
+		}
 		return User{}, fmt.Errorf("update username: %w", err)
 	}
 	affected, err := res.RowsAffected()
@@ -127,6 +136,17 @@ func (db *appdbimpl) UpdateUserName(ctx context.Context, id, name string) (User,
 	}
 	if affected == 0 {
 		return User{}, ErrNotFound
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE messages SET sender_name = ? WHERE sender_id = ?`, name, id); err != nil {
+		return User{}, fmt.Errorf("update message sender names: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE messages SET reply_sender_name = ? WHERE reply_to IN (SELECT id FROM messages WHERE sender_id = ?)`, name, id); err != nil {
+		return User{}, fmt.Errorf("update reply sender names: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return User{}, fmt.Errorf("commit update username: %w", err)
 	}
 	return db.GetUserByID(ctx, id)
 }

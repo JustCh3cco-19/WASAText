@@ -113,6 +113,7 @@ export default {
 		},
 		async refresh() {
 			const silent = arguments.length && arguments[0] === true;
+			const prevCount = this.conversation?.messages?.length || 0;
 			if (!silent) {
 				this.loading = true;
 			}
@@ -126,8 +127,10 @@ export default {
 				this.conversation = data;
 				this.updatePageTitle();
 				await this.$nextTick();
-				if (!silent) {
-					this.scrollToTop();
+				const nextCount = data?.messages?.length || 0;
+				const hasNew = nextCount > prevCount;
+				if (!silent || hasNew) {
+					this.scrollToBottom(hasNew);
 				}
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
@@ -158,7 +161,7 @@ export default {
 				});
 				this.resetComposer();
 				this.replyingTo = null;
-				await this.refresh();
+				await this.refresh(true);
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.toString();
 			}
@@ -339,11 +342,25 @@ export default {
 			if (!this.otherUser) return;
 			this.contactInfoOpen = true;
 		},
-		scrollToTop() {
-			const el = this.$refs.messageThread;
-			if (el && el.scrollHeight != null) {
-				el.scrollTop = 0;
+		scrollToBottom(smooth = false) {
+			const anchor = this.$refs.threadBottom;
+			const behavior = smooth ? "smooth" : "auto";
+			if (!anchor) return;
+			const composer = this.$refs.chatComposer;
+			if (composer?.getBoundingClientRect) {
+				const composerHeight = composer.getBoundingClientRect().height || 0;
+				const anchorTop = anchor.getBoundingClientRect().top + window.scrollY;
+				const maxTop = (document.documentElement.scrollHeight || document.body.scrollHeight || 0) - window.innerHeight;
+				const target = anchorTop - (window.innerHeight - composerHeight);
+				const top = Math.min(Math.max(target, 0), Math.max(maxTop, 0));
+				window.scrollTo({top, behavior});
+				return;
 			}
+			if (anchor.scrollIntoView) {
+				anchor.scrollIntoView({block: "end", behavior});
+				return;
+			}
+			window.scrollTo({top: document.documentElement.scrollHeight || document.body.scrollHeight || 0, behavior});
 		},
 		replyPreview(message) {
 			if (!message) return "";
@@ -501,9 +518,10 @@ export default {
             </div>
           </div>
         </div>
+        <div ref="threadBottom" class="thread-bottom-anchor" />
       </div>
 
-      <div class="chat-composer card shadow-sm">
+      <div ref="chatComposer" class="chat-composer card shadow-sm">
         <div class="card-body">
           <div v-if="replyingTo" class="alert alert-secondary py-2 px-3 d-flex justify-content-between align-items-center">
             <div>
@@ -649,6 +667,10 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.thread-bottom-anchor {
+  height: 1px;
 }
 
 .message-day-group {

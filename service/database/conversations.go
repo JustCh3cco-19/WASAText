@@ -361,7 +361,7 @@ func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversati
 		       reply_to, reply_content, reply_sender_name, reply_attachment, status
 		FROM messages
 		WHERE conversation_id = ?
-		ORDER BY created_at DESC`, conversationID)
+		ORDER BY created_at ASC`, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("load messages: %w", err)
 	}
