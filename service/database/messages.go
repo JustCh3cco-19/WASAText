@@ -126,6 +126,17 @@ func (db *appdbimpl) ForwardMessage(ctx context.Context, sourceConversationID, m
 		name = trimmed
 	}
 
+	replyTo := original.ReplyTo
+	replyContent := original.ReplyContent
+	replySenderName := original.ReplySenderName
+	replyAttachment := original.ReplyAttachment
+	if targetConversationID != sourceConversationID {
+		replyTo = ""
+		replyContent = ""
+		replySenderName = ""
+		replyAttachment = ""
+	}
+
 	status := "forwarded"
 	if strings.TrimSpace(original.Status) != "" {
 		status = strings.TrimSpace(original.Status)
@@ -137,10 +148,10 @@ func (db *appdbimpl) ForwardMessage(ctx context.Context, sourceConversationID, m
 		SenderName:      name,
 		Content:         original.Content,
 		Attachment:      original.Attachment,
-		ReplyTo:         original.ReplyTo,
-		ReplyContent:    original.ReplyContent,
-		ReplySenderName: original.ReplySenderName,
-		ReplyAttachment: original.ReplyAttachment,
+		ReplyTo:         replyTo,
+		ReplyContent:    replyContent,
+		ReplySenderName: replySenderName,
+		ReplyAttachment: replyAttachment,
 		Status:          status,
 		Timestamp:       time.Now().UTC(),
 	})

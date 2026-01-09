@@ -29,6 +29,13 @@ export default {
 			cropModalOpen: false,
 			newUserQuery: "",
 			addingUser: false,
+			userSearch: {
+				loading: false,
+				results: [],
+				searched: false,
+				error: null,
+			},
+			userSearchTimer: null,
 		};
 	},
 	computed: {
@@ -58,7 +65,59 @@ export default {
 	mounted() {
 		this.refresh();
 	},
+	beforeUnmount() {
+		if (this.userSearchTimer) {
+			clearTimeout(this.userSearchTimer);
+		}
+	},
 	methods: {
+		clearUserSearch() {
+			if (this.userSearchTimer) {
+				clearTimeout(this.userSearchTimer);
+				this.userSearchTimer = null;
+			}
+			this.userSearch.loading = false;
+			this.userSearch.results = [];
+			this.userSearch.searched = false;
+			this.userSearch.error = null;
+		},
+		queueUserSearch() {
+			if (this.userSearchTimer) {
+				clearTimeout(this.userSearchTimer);
+			}
+			const query = (this.newUserQuery || "").trim();
+			if (!query) {
+				this.clearUserSearch();
+				return;
+			}
+			this.userSearchTimer = setTimeout(() => {
+				this.searchUsers();
+			}, 250);
+		},
+		async searchUsers(showAll = false) {
+			const query = showAll ? "" : this.newUserQuery.trim();
+			if (!showAll && !query) {
+				this.clearUserSearch();
+				return;
+			}
+			this.userSearch.loading = true;
+			this.userSearch.error = null;
+			try {
+				const res = await api.searchUsers(query);
+				this.userSearch.results = res.users || [];
+				this.userSearch.searched = true;
+			} catch (e) {
+				this.userSearch.error = e?.response?.data?.error || e.toString();
+			}
+			this.userSearch.loading = false;
+		},
+		isMember(userId) {
+			if (!userId) return false;
+			if (this.group?.memberDetails?.length) {
+				return this.group.memberDetails.some((member) => member.id === userId);
+			}
+			return (this.group?.members || []).includes(userId);
+		},
 		async refresh() {
 			this.loading = true;
 			this.errormsg = null;
@@ -183,6 +242,21 @@ export default {
 				const userId = await this.resolveUserId(this.newUserQuery);
 				await api.addToGroup(this.id, userId);
 				this.newUserQuery = "";
+				this.clearUserSearch();
+				await this.refresh();
+			} catch (e) {
+				this.errormsg = e?.response?.data?.error || e.message || e.toString();
+			}
+			this.addingUser = false;
+		},
+		async addUserById(userId) {
+			if (!userId || this.isMember(userId)) return;
+			this.addingUser = true;
+			this.errormsg = null;
+			try {
+				await api.addToGroup(this.id, userId);
+				this.newUserQuery = "";
+				this.clearUserSearch();
 				await this.refresh();
 			} catch (e) {
 				this.errormsg = e?.response?.data?.error || e.message || e.toString();
@@ -259,9 +333,29 @@ export default {
                     v-model="newUserQuery"
                     class="form-control"
                     placeholder="Nome utente"
+                    @input="queueUserSearch"
                     @keyup.enter="addUser"
                   >
                   <button class="btn btn-secondary" :disabled="addingUser" @click="addUser">Aggiungi</button>
+                </div>
+                <div class="mt-2">
+                  <div v-if="userSearch.error" class="text-danger small mb-2">{{ userSearch.error }}</div>
+                  <div v-if="userSearch.loading" class="text-muted small">Caricamento...</div>
+                  <div v-else class="list-group user-picker">
+                    <button
+                      v-for="user in userSearch.results"
+                      :key="user.id"
+                      class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                      :disabled="addingUser || isMember(user.id)"
+                      @click="addUserById(user.id)"
+                    >
+                      <span>{{ user.name || user.id }}</span>
+                      <span class="badge bg-light text-dark">{{ isMember(user.id) ? "Gia membro" : "Aggiungi" }}</span>
+                    </button>
+                    <div v-if="userSearch.results.length === 0 && userSearch.searched" class="text-muted small">
+                      Nessun utente trovato.
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="list-group">
@@ -347,5 +441,10 @@ export default {
 
 .crop-dialog {
   width: min(720px, 95vw);
+}
+
+.user-picker {
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>
