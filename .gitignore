@@ -15,5 +15,5 @@ docker-compose.log
 .vscode/*
 !.vscode/extensions.json
 .gocache/
-webapi
+/webapi
 manual-tests.md
