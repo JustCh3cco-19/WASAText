@@ -1,0 +1,7 @@
+.git
+.github
+webui/node_modules
+webui/dist
+webui/.yarn
+*.db
+*.log

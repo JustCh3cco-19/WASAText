@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -17,8 +16,7 @@ func (rt *_router) handleSendMessage(w http.ResponseWriter, r *http.Request, ps 
 		writeError(w, http.StatusBadRequest, "Conversation ID is required")
 		return
 	}
-	if err := r.ParseMultipartForm(maxMultipartMemory); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid multipart payload")
+	if err := parseMultipart(w, r); err != nil {
 		return
 	}
 	content := strings.TrimSpace(r.FormValue("content"))
@@ -27,6 +25,12 @@ func (rt *_router) handleSendMessage(w http.ResponseWriter, r *http.Request, ps 
 	if content == "" && attachment == "" {
 		writeError(w, http.StatusBadRequest, "Content or attachment is required")
 		return
+	}
+	if attachment != "" {
+		if _, err := decodeBase64Payload(attachment); err != nil {
+			writeError(w, http.StatusBadRequest, "Attachment must be valid base64")
+			return
+		}
 	}
 	if len(content) > 1000 {
 		writeError(w, http.StatusBadRequest, "Content exceeds maximum length")
@@ -61,8 +65,7 @@ func (rt *_router) handleForwardMessage(w http.ResponseWriter, r *http.Request, 
 		TargetUserID         string `json:"targetUserId"`
 		ForwarderName        string `json:"forwarderName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.TargetConversationID = strings.TrimSpace(payload.TargetConversationID)

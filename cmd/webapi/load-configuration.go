@@ -22,10 +22,12 @@ type WebAPIConfiguration struct {
 		ReadTimeout     time.Duration `conf:"default:5s"`
 		WriteTimeout    time.Duration `conf:"default:5s"`
 		ShutdownTimeout time.Duration `conf:"default:5s"`
+		CORSOrigins     string        `conf:"default:http://localhost:8080"`
 	}
 	Debug bool
 	DB    struct {
-		Filename string `conf:"default:/tmp/decaf.db"`
+		Filename    string        `conf:"default:/tmp/decaf.db"`
+		BusyTimeout time.Duration `conf:"default:5s"`
 	}
 }
 

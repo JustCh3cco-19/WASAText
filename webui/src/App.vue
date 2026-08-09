@@ -2,14 +2,19 @@
 import {computed} from "vue";
 import {RouterLink, RouterView, useRouter} from "vue-router";
 import sessionStore from "./services/sessionStore.js";
+import api from "./services/api.js";
 
 const router = useRouter();
 const isAuthenticated = computed(() => sessionStore.isAuthenticated());
-const userLabel = computed(() => sessionStore.state.user?.name || sessionStore.state.token || "Ospite");
+const userLabel = computed(() => sessionStore.state.user?.name || "Ospite");
 
-function doLogout() {
-	sessionStore.logout();
-	router.push("/login");
+async function doLogout() {
+	try {
+		await api.logout();
+	} finally {
+		sessionStore.logout();
+		router.push("/login");
+	}
 }
 </script>
 

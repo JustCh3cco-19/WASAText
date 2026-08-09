@@ -17,4 +17,3 @@ docker-compose.log
 .gocache/
 webapi
 manual-tests.md
-scripts/

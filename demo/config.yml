@@ -14,4 +14,8 @@ log:
 #  readtimeout: 5s
 #  writetimeout: 5s
 #  shutdowntimeout: 5s
+#  corsorigins: http://localhost:8080
 #  behindproxy: false
+#db:
+#  filename: /data/wasatext.db
+#  busytimeout: 5s

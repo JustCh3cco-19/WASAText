@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -31,8 +30,7 @@ func (rt *_router) handleListGroups(w http.ResponseWriter, r *http.Request, _ ht
 }
 
 func (rt *_router) handleCreateGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
-	if err := r.ParseMultipartForm(maxMultipartMemory); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid multipart payload")
+	if err := parseMultipart(w, r); err != nil {
 		return
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
@@ -59,6 +57,10 @@ func (rt *_router) handleCreateGroup(w http.ResponseWriter, r *http.Request, _ h
 		members = append(members, ctx.AuthenticatedUser.ID)
 	}
 	image := strings.TrimSpace(r.FormValue("image"))
+	if image != "" && !validImagePayload(image) {
+		writeError(w, http.StatusBadRequest, "Group image must be a valid base64 PNG, JPEG or GIF")
+		return
+	}
 
 	group, err := rt.db.CreateGroupConversation(r.Context(), name, image, members)
 	if err != nil {
@@ -104,8 +106,7 @@ func (rt *_router) handleAddGroupMember(w http.ResponseWriter, r *http.Request, 
 	var payload struct {
 		UserID string `json:"userId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.UserID = strings.TrimSpace(payload.UserID)
@@ -129,8 +130,7 @@ func (rt *_router) handleUpdateGroupName(w http.ResponseWriter, r *http.Request,
 	var payload struct {
 		GroupName string `json:"groupName"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.GroupName = strings.TrimSpace(payload.GroupName)
@@ -152,14 +152,17 @@ func (rt *_router) handleUpdateGroupPhoto(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "Group ID is required")
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBinaryPayload))
+	body, err := readBinaryBody(w, r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "Unable to read payload")
 		return
 	}
 	photo := strings.TrimSpace(string(body))
 	if photo == "" {
 		writeError(w, http.StatusBadRequest, "Photo payload cannot be empty")
+		return
+	}
+	if !validImagePayload(photo) {
+		writeError(w, http.StatusBadRequest, "Photo must be a valid base64 PNG, JPEG or GIF")
 		return
 	}
 	if err := rt.db.UpdateGroupPhoto(r.Context(), ctx.AuthenticatedUser.ID, groupID, photo); err != nil {

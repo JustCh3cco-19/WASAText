@@ -60,6 +60,7 @@ type conversationDetailsResponse struct {
 	LastMessage       *messageResponse  `json:"lastMessage,omitempty"`
 	Messages          []messageResponse `json:"messages"`
 	IsGroup           bool              `json:"isGroup"`
+	Page              pageResponse      `json:"page"`
 }
 
 type groupResponse struct {

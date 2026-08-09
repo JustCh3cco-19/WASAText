@@ -38,7 +38,7 @@ package api
 
 import (
 	"errors"
-	"github.com/JustCh3cco-19/WASAText/service/database"
+	"github.com/JustCh3cco-19/WASAText/service/application"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -50,7 +50,7 @@ type Config struct {
 	Logger logrus.FieldLogger
 
 	// Database is the instance of database.AppDatabase where data are saved
-	Database database.AppDatabase
+	Application application.Service
 }
 
 // Router is the package API interface representing an API handler builder
@@ -68,8 +68,8 @@ func New(cfg Config) (Router, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("logger is required")
 	}
-	if cfg.Database == nil {
-		return nil, errors.New("database is required")
+	if cfg.Application == nil {
+		return nil, errors.New("application service is required")
 	}
 
 	// Create a new router where we will register HTTP endpoints. The server will pass requests to this router to be
@@ -79,9 +79,11 @@ func New(cfg Config) (Router, error) {
 	router.RedirectFixedPath = false
 
 	return &_router{
-		router:     router,
-		baseLogger: cfg.Logger,
-		db:         cfg.Database,
+		router:       router,
+		baseLogger:   cfg.Logger,
+		db:           cfg.Application,
+		authLimiter:  newRateLimiter(),
+		metricsState: newRequestMetrics(),
 	}, nil
 }
 
@@ -92,5 +94,7 @@ type _router struct {
 	// Use context logger if available (e.g., in requests) instead of this logger.
 	baseLogger logrus.FieldLogger
 
-	db database.AppDatabase
+	db           application.Service
+	authLimiter  *rateLimiter
+	metricsState *requestMetrics
 }

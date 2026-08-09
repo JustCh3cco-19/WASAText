@@ -16,7 +16,10 @@ type conversationRow struct {
 	IsGroup bool
 }
 
-func (db *appdbimpl) ListConversations(ctx context.Context, userID string) ([]ConversationSummary, error) {
+func (db *appdbimpl) ListConversations(ctx context.Context, userID string, limit, offset int) ([]ConversationSummary, error) {
+	if limit < 1 || limit > 100 || offset < 0 {
+		return nil, ErrBadRequest
+	}
 	if err := db.markMessagesDeliveredForUser(ctx, userID); err != nil {
 		return nil, err
 	}
@@ -28,7 +31,8 @@ func (db *appdbimpl) ListConversations(ctx context.Context, userID string) ([]Co
 		WHERE m.user_id = ?
 		ORDER BY (
 			SELECT COALESCE(MAX(created_at), c.created_at) FROM messages WHERE conversation_id = c.id
-		) DESC, c.created_at DESC, c.id ASC`, userID)
+		) DESC, c.created_at DESC, c.id ASC
+		LIMIT ? OFFSET ?`, userID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list conversations: %w", err)
 	}
@@ -150,10 +154,13 @@ func (db *appdbimpl) EnsureDirectConversation(ctx context.Context, requesterID, 
 	if err != nil {
 		return ConversationDetails{}, err
 	}
-	return db.GetConversationDetails(ctx, requesterID, conversationID)
+	return db.GetConversationDetails(ctx, requesterID, conversationID, 100, 0)
 }
 
-func (db *appdbimpl) GetConversationDetails(ctx context.Context, userID, conversationID string) (ConversationDetails, error) {
+func (db *appdbimpl) GetConversationDetails(ctx context.Context, userID, conversationID string, messageLimit, messageOffset int) (ConversationDetails, error) {
+	if messageLimit < 1 || messageLimit > 200 || messageOffset < 0 {
+		return ConversationDetails{}, ErrBadRequest
+	}
 	row := db.c.QueryRowContext(ctx, `SELECT id, name, photo, is_group FROM conversations WHERE id = ?`, conversationID)
 	var convRow conversationRow
 	var isGroup int
@@ -188,7 +195,7 @@ func (db *appdbimpl) GetConversationDetails(ctx context.Context, userID, convers
 		return ConversationDetails{}, err
 	}
 
-	messages, err := db.loadMessagesForConversation(ctx, conversationID)
+	messages, err := db.loadMessagesForConversation(ctx, conversationID, messageLimit, messageOffset)
 	if err != nil {
 		return ConversationDetails{}, err
 	}
@@ -355,13 +362,15 @@ func (db *appdbimpl) isConversationMember(ctx context.Context, conversationID, u
 	return true, nil
 }
 
-func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversationID string) ([]Message, error) {
+func (db *appdbimpl) loadMessagesForConversation(ctx context.Context, conversationID string, limit, offset int) ([]Message, error) {
 	rows, err := db.c.QueryContext(ctx, `
 		SELECT id, conversation_id, sender_id, sender_name, content, attachment, created_at,
-		       reply_to, reply_content, reply_sender_name, reply_attachment, status
-		FROM messages
-		WHERE conversation_id = ?
-		ORDER BY created_at ASC`, conversationID)
+		       reply_to, reply_content, reply_sender_name, reply_attachment, status FROM (
+			SELECT id, conversation_id, sender_id, sender_name, content, attachment, created_at,
+			       reply_to, reply_content, reply_sender_name, reply_attachment, status
+			FROM messages WHERE conversation_id = ?
+			ORDER BY created_at DESC LIMIT ? OFFSET ?
+		) ORDER BY created_at ASC`, conversationID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("load messages: %w", err)
 	}

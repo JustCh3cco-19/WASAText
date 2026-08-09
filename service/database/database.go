@@ -14,17 +14,19 @@ const usersTable = "users"
 type AppDatabase interface {
 	Ping() error
 
-	LoginUser(ctx context.Context, name string) (User, string, error)
+	RegisterUser(ctx context.Context, name, password string) (User, string, error)
+	LoginUser(ctx context.Context, name, password string) (User, string, error)
 	GetUserByToken(ctx context.Context, token string) (User, error)
+	RevokeToken(ctx context.Context, token string) error
 	GetUserByID(ctx context.Context, id string) (User, error)
 	UpdateUserPhoto(ctx context.Context, id, photo string) (User, error)
 	UpdateUserName(ctx context.Context, id, name string) (User, error)
-	SearchUsers(ctx context.Context, username, excludeID string) ([]User, error)
+	SearchUsers(ctx context.Context, username, excludeID string, limit, offset int) ([]User, error)
 
-	ListConversations(ctx context.Context, userID string) ([]ConversationSummary, error)
+	ListConversations(ctx context.Context, userID string, limit, offset int) ([]ConversationSummary, error)
 	EnsureDirectConversation(ctx context.Context, requesterID, recipientID string) (ConversationDetails, error)
 	EnsureDirectConversationID(ctx context.Context, requesterID, recipientID string) (string, error)
-	GetConversationDetails(ctx context.Context, userID, conversationID string) (ConversationDetails, error)
+	GetConversationDetails(ctx context.Context, userID, conversationID string, messageLimit, messageOffset int) (ConversationDetails, error)
 
 	CreateGroupConversation(ctx context.Context, name, photo string, memberIDs []string) (Group, error)
 	ListGroups(ctx context.Context, userID string) ([]Group, error)
@@ -58,11 +60,19 @@ func New(db *sql.DB) (AppDatabase, error) {
 	}
 
 	schema := []string{
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			applied_at TEXT NOT NULL
+		);`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
 			photo TEXT NOT NULL DEFAULT '',
 			auth_token TEXT NOT NULL DEFAULT '',
+			auth_token_expires_at TEXT NOT NULL DEFAULT '',
+			password_salt TEXT NOT NULL DEFAULT '',
+			password_hash TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS conversations (
@@ -116,7 +126,6 @@ func New(db *sql.DB) (AppDatabase, error) {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at DESC);`,
 		`CREATE INDEX IF NOT EXISTS idx_members_user ON conversation_members(user_id);`,
-		`CREATE INDEX IF NOT EXISTS idx_members_conversation ON conversation_members(conversation_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_status_user ON message_status(user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_status_message ON message_status(message_id);`,
 	}
@@ -126,12 +135,22 @@ func New(db *sql.DB) (AppDatabase, error) {
 			return nil, fmt.Errorf("creating database structure: %w", err)
 		}
 	}
+	// The composite primary key already covers lookups by conversation_id.
+	if _, err := db.Exec(`DROP INDEX IF EXISTS idx_members_conversation`); err != nil {
+		return nil, fmt.Errorf("drop redundant members index: %w", err)
+	}
 
 	if err := ensureUsersTable(db); err != nil {
 		return nil, err
 	}
 	if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_auth_token ON users(auth_token) WHERE auth_token != ''`); err != nil {
 		return nil, fmt.Errorf("create auth token index: %w", err)
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (1, 'baseline', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`); err != nil {
+		return nil, fmt.Errorf("record baseline migration: %w", err)
+	}
+	if _, err := db.Exec(`INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (2, 'secure_credentials_and_expiring_sessions', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`); err != nil {
+		return nil, fmt.Errorf("record credentials migration: %w", err)
 	}
 
 	return &appdbimpl{
@@ -183,7 +202,7 @@ func ensureUsersTable(db *sql.DB) error {
 		}
 	}
 
-	required := []string{"id", "name", "photo", "auth_token", "created_at"}
+	required := []string{"id", "name", "photo", "auth_token", "auth_token_expires_at", "password_salt", "password_hash", "created_at"}
 	needsMigration := !hasUsers
 	for _, name := range required {
 		if _, ok := existing[name]; !ok {
@@ -192,12 +211,6 @@ func ensureUsersTable(db *sql.DB) error {
 		}
 	}
 	if !needsMigration {
-		if _, ok := existing["password_hash"]; ok {
-			needsMigration = true
-		}
-		if _, ok := existing["password_salt"]; ok {
-			needsMigration = true
-		}
 		if sourceTable != usersTable {
 			needsMigration = true
 		}
@@ -229,6 +242,9 @@ func ensureUsersTable(db *sql.DB) error {
 		name TEXT NOT NULL UNIQUE,
 		photo TEXT NOT NULL DEFAULT '',
 		auth_token TEXT NOT NULL DEFAULT '',
+		auth_token_expires_at TEXT NOT NULL DEFAULT '',
+		password_salt TEXT NOT NULL DEFAULT '',
+		password_hash TEXT NOT NULL DEFAULT '',
 		created_at TEXT NOT NULL
 	);`); err != nil {
 		return fmt.Errorf("create users table: %w", err)
@@ -237,14 +253,25 @@ func ensureUsersTable(db *sql.DB) error {
 	if hasUsers || hasUsersOld {
 		authSelect := "''"
 		if _, ok := existing["auth_token"]; ok {
-			authSelect = "auth_token"
+			// Legacy tokens were stored in plaintext and had no expiry. Invalidate
+			// them during the security migration instead of carrying them forward.
+			authSelect = "''"
 		}
+		authExpirySelect := "''"
 		createdAtSelect := `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
 		if _, ok := existing["created_at"]; ok {
 			createdAtSelect = "created_at"
 		}
-		insertStmt := fmt.Sprintf(`INSERT INTO users_new (id, name, photo, auth_token, created_at)
-			SELECT id, name, photo, %s, %s FROM %s`, authSelect, createdAtSelect, sourceTable)
+		passwordSaltSelect := "''"
+		if _, ok := existing["password_salt"]; ok {
+			passwordSaltSelect = "password_salt"
+		}
+		passwordHashSelect := "''"
+		if _, ok := existing["password_hash"]; ok {
+			passwordHashSelect = "password_hash"
+		}
+		insertStmt := fmt.Sprintf(`INSERT INTO users_new (id, name, photo, auth_token, auth_token_expires_at, password_salt, password_hash, created_at)
+			SELECT id, name, photo, %s, %s, %s, %s, %s FROM %s`, authSelect, authExpirySelect, passwordSaltSelect, passwordHashSelect, createdAtSelect, sourceTable)
 		if _, err := tx.Exec(insertStmt); err != nil {
 			return fmt.Errorf("migrate users data: %w", err)
 		}
@@ -399,9 +426,6 @@ func rebuildConversationMembers(tx *sql.Tx) error {
 	}
 	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_members_user ON conversation_members(user_id);`); err != nil {
 		return fmt.Errorf("create idx_members_user: %w", err)
-	}
-	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_members_conversation ON conversation_members(conversation_id);`); err != nil {
-		return fmt.Errorf("create idx_members_conversation: %w", err)
 	}
 	return nil
 }

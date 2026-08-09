@@ -34,23 +34,35 @@ func (rt *_router) wrapAuthenticated(fn authedHandler) func(http.ResponseWriter,
 }
 
 func (rt *_router) authenticate(r *http.Request) (database.User, error) {
-	header := r.Header.Get("Authorization")
-	if strings.TrimSpace(header) == "" {
-		return database.User{}, errMissingToken
-	}
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return database.User{}, errInvalidToken
-	}
-	token := strings.TrimSpace(parts[1])
-	if token == "" {
-		return database.User{}, errInvalidToken
+	token, err := bearerToken(r)
+	if err != nil {
+		return database.User{}, err
 	}
 	user, err := rt.db.GetUserByToken(r.Context(), token)
 	if err != nil {
 		return database.User{}, err
 	}
 	return user, nil
+}
+
+func bearerToken(r *http.Request) (string, error) {
+	header := r.Header.Get("Authorization")
+	if strings.TrimSpace(header) == "" {
+		cookie, err := r.Cookie(sessionCookieName)
+		if err == nil && strings.TrimSpace(cookie.Value) != "" {
+			return strings.TrimSpace(cookie.Value), nil
+		}
+		return "", errMissingToken
+	}
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", errInvalidToken
+	}
+	token := strings.TrimSpace(parts[1])
+	if token == "" {
+		return "", errInvalidToken
+	}
+	return token, nil
 }
 
 func (rt *_router) handleAuthError(w http.ResponseWriter, ctx reqcontext.RequestContext, err error) {

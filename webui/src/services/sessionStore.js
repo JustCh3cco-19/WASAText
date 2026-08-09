@@ -11,18 +11,11 @@ try {
 }
 
 const state = reactive({
-	token: localStorage.getItem("token") || null,
 	user: storedUser,
 });
 
-function setToken(token) {
-	state.token = token;
-	if (token) {
-		localStorage.setItem("token", token);
-	} else {
-		localStorage.removeItem("token");
-	}
-}
+// Remove bearer tokens persisted by releases prior to HttpOnly cookie sessions.
+localStorage.removeItem("token");
 
 function setUser(user) {
 	state.user = user || null;
@@ -34,17 +27,16 @@ function setUser(user) {
 }
 
 function logout() {
-	setToken(null);
 	setUser(null);
+	localStorage.removeItem("token");
 }
 
 function isAuthenticated() {
-	return !!state.token;
+	return !!state.user;
 }
 
 export default {
 	state,
-	setToken,
 	setUser,
 	logout,
 	isAuthenticated,

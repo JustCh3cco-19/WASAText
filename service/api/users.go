@@ -1,9 +1,7 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -20,14 +18,17 @@ func (rt *_router) handleUpdateUserPhoto(w http.ResponseWriter, r *http.Request,
 		writeError(w, http.StatusUnauthorized, "Token di autenticazione mancante")
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBinaryPayload))
+	body, err := readBinaryBody(w, r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "Impossibile leggere il payload della foto")
 		return
 	}
 	photo := strings.TrimSpace(string(body))
 	if photo == "" {
 		writeError(w, http.StatusBadRequest, "Il payload della foto non puo essere vuoto")
+		return
+	}
+	if !validImagePayload(photo) {
+		writeError(w, http.StatusBadRequest, "La foto deve essere un'immagine PNG, JPEG o GIF valida in base64")
 		return
 	}
 
@@ -47,8 +48,7 @@ func (rt *_router) handleUpdateUserName(w http.ResponseWriter, r *http.Request, 
 	var payload struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Payload JSON non valido")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.Name = strings.TrimSpace(payload.Name)

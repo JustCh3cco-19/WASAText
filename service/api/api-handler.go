@@ -5,7 +5,9 @@ import "net/http"
 // Handler returns an instance of httprouter.Router that handle APIs registered here
 func (rt *_router) Handler() http.Handler {
 	// Public routes
-	rt.router.POST("/session", rt.wrap(rt.handleLogin))
+	rt.router.POST("/session", rt.wrapAuthRateLimit(rt.wrap(rt.handleLogin)))
+	rt.router.POST("/users", rt.wrapAuthRateLimit(rt.wrap(rt.handleRegister)))
+	rt.router.DELETE("/session", rt.wrapAuthenticated(rt.handleLogout))
 
 	// Authenticated routes
 	rt.router.PUT("/users/photo", rt.wrapAuthenticated(rt.handleUpdateUserPhoto))
@@ -32,6 +34,8 @@ func (rt *_router) Handler() http.Handler {
 
 	// Special routes
 	rt.router.GET("/liveness", rt.liveness)
+	rt.router.GET("/readiness", rt.readiness)
+	rt.router.GET("/metrics", rt.metrics)
 
 	return rt.router
 }

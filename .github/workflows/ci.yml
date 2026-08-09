@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: gofmt -w . && git diff --exit-code
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: go build ./cmd/webapi ./cmd/healthcheck
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build-prod
+
+  openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: stoplightio/spectral-action@v0.8.13
+        with:
+          file_glob: doc/api.yaml
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up --build --wait
+      - run: ./scripts/e2e.sh
+      - if: always()
+        run: docker compose down -v

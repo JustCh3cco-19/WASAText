@@ -1,6 +1,6 @@
 module github.com/JustCh3cco-19/WASAText
 
-go 1.17
+go 1.23
 
 require (
 	github.com/ardanlabs/conf v1.5.0

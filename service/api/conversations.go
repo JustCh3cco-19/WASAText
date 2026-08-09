@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -10,15 +9,22 @@ import (
 )
 
 func (rt *_router) handleListConversations(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
-	convs, err := rt.db.ListConversations(r.Context(), ctx.AuthenticatedUser.ID)
+	limit, offset, err := parsePage(r, 50, 100)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid pagination")
+		return
+	}
+	convs, err := rt.db.ListConversations(r.Context(), ctx.AuthenticatedUser.ID, limit, offset)
 	if err != nil {
 		rt.respondDBError(w, ctx, err, "")
 		return
 	}
 	response := struct {
 		Conversations []conversationSummaryResponse `json:"conversations"`
+		Page          pageResponse                  `json:"page"`
 	}{
 		Conversations: make([]conversationSummaryResponse, 0, len(convs)),
+		Page:          pageResponse{Limit: limit, Offset: offset},
 	}
 	for _, c := range convs {
 		response.Conversations = append(response.Conversations, toConversationSummaryResponse(c))
@@ -30,8 +36,7 @@ func (rt *_router) handleStartConversation(w http.ResponseWriter, r *http.Reques
 	var payload struct {
 		RecipientID string `json:"recipientId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.RecipientID = strings.TrimSpace(payload.RecipientID)
@@ -54,10 +59,17 @@ func (rt *_router) handleGetConversation(w http.ResponseWriter, r *http.Request,
 		writeError(w, http.StatusBadRequest, "Conversation ID is required")
 		return
 	}
-	details, err := rt.db.GetConversationDetails(r.Context(), ctx.AuthenticatedUser.ID, conversationID)
+	limit, offset, err := parsePage(r, 100, 200)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid pagination")
+		return
+	}
+	details, err := rt.db.GetConversationDetails(r.Context(), ctx.AuthenticatedUser.ID, conversationID, limit, offset)
 	if err != nil {
 		rt.respondDBError(w, ctx, err, "Conversation not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, toConversationDetailsResponse(details))
+	response := toConversationDetailsResponse(details)
+	response.Page = pageResponse{Limit: limit, Offset: offset}
+	writeJSON(w, http.StatusOK, response)
 }

@@ -3,9 +3,18 @@ import axios from "./axios.js";
 const defaultHeaders = (contentType) => contentType ? {"Content-Type": contentType} : {};
 
 export default {
-	async login(name) {
-		const {data} = await axios.post("/session", {name});
+	async login(name, password) {
+		const {data} = await axios.post("/session", {name, password});
 		return data;
+	},
+
+	async register(name, password) {
+		const {data} = await axios.post("/users", {name, password});
+		return data;
+	},
+
+	async logout() {
+		await axios.delete("/session");
 	},
 
 	async getConversations() {
@@ -115,7 +124,7 @@ export default {
 	async updateGroupName(groupId, name) {
 		const {data} = await axios.put(
 			`/groups/${groupId}/name`,
-			{name}
+			{groupName: name}
 		);
 		return data;
 	},

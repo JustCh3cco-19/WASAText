@@ -36,15 +36,16 @@ const resolveApiBaseUrl = () => {
 
 const instance = axios.create({
 	baseURL: resolveApiBaseUrl(),
-	timeout: 1000 * 10
+	timeout: 1000 * 10,
+	withCredentials: true,
 });
 
-// Attach Authorization header when a token is available.
-instance.interceptors.request.use((config) => {
-	if (sessionStore.state.token) {
-		config.headers.Authorization = `Bearer ${sessionStore.state.token}`;
+instance.interceptors.response.use(
+	(response) => response,
+	(error) => {
+		if (error?.response?.status === 401) { sessionStore.logout(); }
+		return Promise.reject(error);
 	}
-	return config;
-});
+);
 
 export default instance;

@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build:
@@ -8,6 +6,17 @@ services:
     container_name: wasa-text-backend
     ports:
       - "3000:3000"
+    environment:
+      CFG_DB_FILENAME: /data/wasatext.db
+      CFG_WEB_CORSORIGINS: http://localhost:8080
+    volumes:
+      - wasatext-data:/data
+    healthcheck:
+      test: ["CMD", "/app/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
 
   frontend:
@@ -16,7 +25,11 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: wasa-text-frontend
     ports:
-      - "8080:80"
+      - "8080:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  wasatext-data:

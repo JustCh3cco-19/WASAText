@@ -33,9 +33,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/JustCh3cco-19/WASAText/service/api"
+	"github.com/JustCh3cco-19/WASAText/service/application"
 	"github.com/JustCh3cco-19/WASAText/service/database"
 	"github.com/JustCh3cco-19/WASAText/service/globaltime"
 	"github.com/ardanlabs/conf"
@@ -84,7 +87,12 @@ func run() error {
 
 	// Start Database
 	logger.Println("initializing database support")
-	dbconn, err := sql.Open("sqlite3", cfg.DB.Filename)
+	dsnSeparator := "?"
+	if strings.Contains(cfg.DB.Filename, "?") {
+		dsnSeparator = "&"
+	}
+	dsn := fmt.Sprintf("%s%s_foreign_keys=on&_busy_timeout=%d&_journal_mode=WAL", cfg.DB.Filename, dsnSeparator, cfg.DB.BusyTimeout.Milliseconds())
+	dbconn, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		logger.WithError(err).Error("error opening SQLite DB")
 		return fmt.Errorf("opening SQLite: %w", err)
@@ -93,10 +101,21 @@ func run() error {
 		logger.Debug("database stopping")
 		_ = dbconn.Close()
 	}()
+	// SQLite serializes writes. A single pooled connection also guarantees that
+	// connection-scoped PRAGMAs are consistently applied.
+	dbconn.SetMaxOpenConns(1)
+	dbconn.SetMaxIdleConns(1)
+	if err := dbconn.Ping(); err != nil {
+		return fmt.Errorf("pinging SQLite: %w", err)
+	}
 	db, err := database.New(dbconn)
 	if err != nil {
 		logger.WithError(err).Error("error creating AppDatabase")
 		return fmt.Errorf("creating AppDatabase: %w", err)
+	}
+	app, err := application.New(db)
+	if err != nil {
+		return fmt.Errorf("creating application service: %w", err)
 	}
 
 	// Start (main) API server
@@ -113,8 +132,8 @@ func run() error {
 
 	// Create the API router
 	apirouter, err := api.New(api.Config{
-		Logger:   logger,
-		Database: db,
+		Logger:      logger,
+		Application: app,
 	})
 	if err != nil {
 		logger.WithError(err).Error("error creating the API server instance")
@@ -129,7 +148,8 @@ func run() error {
 	}
 
 	// Apply CORS policy
-	router = applyCORSHandler(router)
+	router = applyCORSHandler(router, cfg.Web.CORSOrigins)
+	router = applySecurityHeaders(router)
 
 	// Create the API server
 	apiserver := http.Server{
@@ -138,6 +158,8 @@ func run() error {
 		ReadTimeout:       cfg.Web.ReadTimeout,
 		ReadHeaderTimeout: cfg.Web.ReadTimeout,
 		WriteTimeout:      cfg.Web.WriteTimeout,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	// Start the service listening for requests in a separate goroutine

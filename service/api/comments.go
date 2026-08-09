@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -19,8 +18,7 @@ func (rt *_router) handleCommentMessage(w http.ResponseWriter, r *http.Request, 
 	var payload struct {
 		Content string `json:"content"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON payload")
+	if err := decodeJSON(w, r, &payload); err != nil {
 		return
 	}
 	payload.Content = strings.TrimSpace(payload.Content)
